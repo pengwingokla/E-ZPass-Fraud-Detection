@@ -8,6 +8,12 @@ backend/**/*
 frontend/**/*
 !frontend/.gitkeep
 
+# Specific files to ignore
+IMPLEMENTATION-STATUS.md
+README.md
+SETUP-GUIDE.md
+ezpass-fraud-detection-workflow.mmd
+
 # Dependencies
 node_modules/
 npm-debug.log*
