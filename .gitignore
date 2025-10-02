@@ -1,8 +1,7 @@
 # Keep folder structure but ignore all files inside folders
 documents/**/*
 !documents/.gitkeep
-docs/**/*
-!docs/.gitkeep
+docs/
 backend/**/*
 !backend/.gitkeep
 frontend/**/*
