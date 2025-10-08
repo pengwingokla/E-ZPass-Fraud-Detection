@@ -1,3 +1,8 @@
-# ezpass-fraud-detection
+# E-ZPass Fraud Detection
 
-### Contributors
+Team:
+Meer Modi (Project Manager)
+Chloe Nguyen
+Eric Liu
+Xitlaly Prado
+Joshua DeMarco
