@@ -109,3 +109,7 @@ frontend/
 ---
 
 Built for New Jersey Courts EZ Pass Fraud Detection System
+
+
+<img width="1406" height="935" alt="image" src="https://github.com/user-attachments/assets/1df165d7-12af-425c-ac8c-697f936dbeb8" />
+<img width="1450" height="720" alt="image" src="https://github.com/user-attachments/assets/979e26a6-8640-435c-895d-73b656c824f8" />
