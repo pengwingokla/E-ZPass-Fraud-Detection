@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MockPass - NJ Toll Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://kit.fontawesome.com/your-fontawesome-kit.js" crossorigin="anonymous"></script> <!-- Add your kit URL -->
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="nav-brand">
+                <div class="logo">MP</div>
+                <h1>MockPass</h1>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Statements Section -->
+        <section id="statements-section" class="section">
+            <h2>Transaction Statements & Reports</h2>
+            <p class="section-description">Download detailed transaction reports and statements for your records.</p>
+            
+            <div class="statements-grid">
+                <div class="download-list">
+                    <div class="download-item">
+                        <div class="file-info">
+                            <div class="file-icon">📄</div>
+                            <div>
+                                <span class="file-name">May 2025 Statement <span class="real-data-label">REAL DATA</span></span>
+                                <span class="file-details">2,927 transactions • Generated: 06/01/2025</span>
+                            </div>
+                        </div>
+                        <a href="data/may-2025-transactions.csv" download class="btn-download">Download CSV</a>
+                    </div>
+                    <div class="download-item">
+                        <div class="file-info">
+                            <div class="file-icon">📄</div>
+                            <div>
+                                <span class="file-name">April 2025 Statement <span class="real-data-label">REAL DATA</span></span>
+                                <span class="file-details">~3,000 transactions • Generated: 05/01/2025</span>
+                            </div>
+                        </div>
+                        <a href="data/april-2025-transactions.csv" download class="btn-download">Download CSV</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2025 MockPass. This is a mock website for testing purposes.</p>
+                <div class="disclaimer">⚠️ This is a simulated website for development and testing. Not a real financial service.</div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
