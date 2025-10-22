@@ -1,0 +1,58 @@
+name: Playwright Tests
+
+on:
+  push:
+    branches: [ main, master, UAT, feat/frontend-testing ]
+    paths:
+      - 'frontend/**'
+  pull_request:
+    branches: [ main, master, UAT, feat/frontend-testing ]
+    paths:
+      - 'frontend/**'
+
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the repo
+      - uses: actions/checkout@v4
+
+      # Setup Node.js
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      # Install dependencies in frontend folder
+      - name: Install dependencies
+        run: npm install
+        working-directory: frontend
+
+      # Install Playwright browsers
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+        working-directory: frontend
+
+      # Start frontend server in background
+      - name: Start frontend server
+        run: npm run start &
+        working-directory: frontend
+
+      # Wait until the frontend server is ready
+      - name: Wait for server to be ready
+        run: npx wait-on http://localhost:3000
+        working-directory: frontend
+
+      # Run Playwright tests
+      - name: Run Playwright tests
+        run: npx playwright test
+        working-directory: frontend
+
+      # Upload the Playwright report
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 30
