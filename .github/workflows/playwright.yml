@@ -29,6 +29,11 @@ jobs:
         run: npm install
         working-directory: frontend
 
+      # Run linting
+      - name: Run ESLint
+        run: npm run lint -- --max-warnings=0
+        working-directory: frontend
+
       # Install Playwright browsers
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
