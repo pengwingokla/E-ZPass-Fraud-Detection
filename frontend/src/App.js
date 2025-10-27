@@ -126,12 +126,13 @@ const rawData = [
     },
 ];
 
+/*
 const recentAlerts = [
     { time: '2 min ago', message: 'High-risk transaction detected', type: 'critical' },
     { time: '5 min ago', message: 'Card skimming pattern identified', type: 'warning' },
     { time: '12 min ago', message: 'Account takeover attempt blocked', type: 'critical' },
 ];
-
+*/
 // --- Icon Components ---
 const ShieldIcon = () => (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -157,6 +158,7 @@ const SearchIcon = () => (
     </svg>
 );
 
+/*
 const TrendUpIcon = () => (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
@@ -168,7 +170,7 @@ const TrendDownIcon = () => (
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
     </svg>
 );
-
+*/
 // --- Chart Components ---
 
 const defaultChartOptions = {
@@ -401,6 +403,8 @@ const SeverityChart = () => {
 };
 
 // --- Risk Gauge Component ---
+
+/*
 const RiskGauge = ({ score, label }) => {
     const getColor = (score) => {
         if (score >= 80) return { bg: 'from-red-500 to-rose-600', text: 'text-red-400', ring: 'ring-red-500/20' };
@@ -452,7 +456,7 @@ const RiskGauge = ({ score, label }) => {
         </div>
     );
 };
-
+*/
 // --- View Components ---
 
 const DashboardView = ({ setActiveView }) => {
