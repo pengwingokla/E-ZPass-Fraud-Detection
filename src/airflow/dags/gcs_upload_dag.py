@@ -130,8 +130,18 @@ def normalize_columns(**context):
             numeric_columns = ['amount', 'prepaid', 'balance']
             for col in numeric_columns:
                 if col in df.columns:
-                    # Remove $ and whitespace from numeric columns
-                    df[col] = df[col].astype(str).str.replace('$', '').str.replace(',', '').str.strip()
+                    # Convert to string
+                    df[col] = df[col].astype(str).str.strip()
+
+                    # Remove $ signs and commas
+                    df[col] = df[col].str.replace('$', '', regex=False).str.replace(',', '', regex=False)
+
+                    # Handle parentheses 
+                    # ($60.56) -> -60.56
+                    mask = df[col].str.contains(r'\(.*\)', regex=True, na=False)
+                    df.loc[mask, col] = '-' + df.loc[mask, col].str.replace('(', '', regex=False).str.replace(')', '', regex=False)
+
+                    # Convert to numeric
                     df[col] = pd.to_numeric(df[col], errors='coerce')
             
             # Add metadata columns
@@ -141,8 +151,8 @@ def normalize_columns(**context):
             normalized_cols = list(df.columns)
             # print(f"  Normalized columns ({len(normalized_cols)}): {normalized_cols[:5]}...")
             # print(f"  Sample dates converted:")
-            # if 'transaction_date' in df.columns:
-            #     print(f"    transaction_date: {df['transaction_date'].iloc[0] if len(df) > 0 else 'N/A'}")
+            # if 'transaction_date' 
+            # ction_date: {df['transaction_date'].iloc[0] if len(df) > 0 else 'N/A'}")
             # if 'entry_time' in df.columns:
             #     print(f"    entry_time: {df['entry_time'].iloc[0] if len(df) > 0 else 'N/A'}")
             
