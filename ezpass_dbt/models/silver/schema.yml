@@ -1,0 +1,36 @@
+version: 2
+
+models:
+  - name: silver
+    description: Staged transactions with proper data types converted from STRING
+    columns:
+      - name: transaction_date
+        description: Date of transaction (converted to DATE)
+        tests:
+          - not_null
+          
+      - name: posting_date
+        description: Date transaction posted (converted to DATE)
+        tests:
+          - not_null
+          
+      - name: tag_plate_number
+        description: EZ-Pass tag or plate number (cleaned, uppercase)
+        tests:
+          - not_null
+          
+      - name: entry_time
+        description: Entry timestamp (converted to TIMESTAMP)
+        
+      - name: exit_time
+        description: Exit timestamp (converted to TIMESTAMP)
+        
+      - name: amount
+        description: Transaction amount (converted to FLOAT64)
+        tests:
+          - not_null
+          
+      - name: source_file
+        description: Original CSV filename
+        tests:
+          - not_null
