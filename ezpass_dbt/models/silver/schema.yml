@@ -89,7 +89,7 @@ models:
     config:
       materialized: ephemeral
     
-  - name: _silver__enrich_names
+  - name: _silver__enrichment
     description: >
       Internal enrichment layer - adds human-readable names for agencies and plazas.
       This is an ephemeral model (not materialized).
