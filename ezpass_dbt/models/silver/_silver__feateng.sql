@@ -93,12 +93,15 @@ new_features AS (
         
         -- Vehicle class category
         CASE 
-            WHEN vehicle_type_code IN ('1', '2') THEN 'Passenger Vehicle'
-            WHEN vehicle_type_code IN ('3', '4', '5') THEN 'Light Commercial'
-            WHEN vehicle_type_code IN ('6', '7', '8', '9') THEN 'Heavy Commercial'
+            WHEN vehicle_type_code IN ('1', '2', '2L', '2H') THEN 'Passenger Vehicle'
+            WHEN vehicle_type_code IN ('3', '3L', '3H', 'B2', 'B3') THEN 'Light Commercial'
+            WHEN vehicle_type_code IN ('4', '5', '6', '7', '8', '9', '4L', '4H', '5H', '6H', '7H') THEN 'Heavy Commercial'
             ELSE 'Unknown'
         END as vehicle_class_category,
         
+        -- Daily Number of Transactions by tag_plate_number
+        COUNT(*) OVER (PARTITION BY tag_plate_number, transaction_date) AS daily_count
+
     FROM enriched
 )
 

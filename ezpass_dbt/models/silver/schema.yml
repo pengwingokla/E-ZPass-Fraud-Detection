@@ -30,10 +30,13 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['GSP', 'NJTP', 'SJ', 'PTC', 'DRJTBC', 'DRPA', 'PANYNJ', 'BCBC', 'NJ E-ZPASS', 'CBDTP']
+              values: ['GSP', 'NJTP', 'SJ', 'PTC', 'DRJTBC', 'DRPA', 'PANYNJ', 'BCBC', 'NJ E-ZPASS', 'CBDTP', 'DELDOT', 'DRBA', 'ILTOLL', 'ITRCC', 'MASSDOT', 'MDTA', 'META', 'MTAB&T', 'NHDOT', 'NYSBA', 'NYSTA', 'OTIC', 'VDOT']
               
       - name: agency_name
         description: Full agency name (e.g., Garden State Parkway)
+
+      - name: state_name
+        description: State name abbreviation (e.g., NJ, NY, PA, DE)
         
       - name: description
         description: Transaction description

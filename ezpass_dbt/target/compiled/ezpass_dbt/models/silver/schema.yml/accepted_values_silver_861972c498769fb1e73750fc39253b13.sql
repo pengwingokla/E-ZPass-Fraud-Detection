@@ -1,0 +1,22 @@
+
+    
+    
+
+with all_values as (
+
+    select
+        agency as value_field,
+        count(*) as n_records
+
+    from `njc-ezpass`.`ezpass_data`.`silver`
+    group by agency
+
+)
+
+select *
+from all_values
+where value_field not in (
+    'GSP','NJTP','SJ','PTC','DRJTBC','DRPA','PANYNJ','BCBC','NJ E-ZPASS','CBDTP'
+)
+
+
