@@ -113,10 +113,19 @@ def create_predictions_table():
     
     # SIMPLIFIED - Only store predictions, not all transaction data
     schema = [
+        # ID columns
         bigquery.SchemaField("transaction_id", "STRING", mode="NULLABLE"),
         bigquery.SchemaField("tag_plate_number", "STRING", mode="NULLABLE"),
         bigquery.SchemaField("last_updated", "DATE", mode="NULLABLE"),
         bigquery.SchemaField("source_file", "STRING", mode="NULLABLE"),
+
+        # Flag columns
+        bigquery.SchemaField("flag_is_weekend", "BOOLEAN", mode="NULLABLE"),
+        bigquery.SchemaField("flag_is_out_of_state", "BOOLEAN", mode="NULLABLE"),
+        bigquery.SchemaField("flag_is_vehicle_type_gt2", "BOOLEAN", mode="NULLABLE"),
+        bigquery.SchemaField("flag_is_holiday", "BOOLEAN", mode="NULLABLE"),
+
+        # Prediction columns
         bigquery.SchemaField("is_anomaly", "INTEGER", mode="REQUIRED"),
         bigquery.SchemaField("anomaly_score", "FLOAT64", mode="REQUIRED"),
         bigquery.SchemaField("prediction_timestamp", "TIMESTAMP", mode="REQUIRED"),  # When prediction was made
@@ -164,7 +173,7 @@ def run_fraud_training():
 
 # Define the DAG
 with DAG(
-    'ml_training_pipeline',
+    'model_training',
     default_args=default_args,
     start_date=datetime(2024, 1, 1, tzinfo=local_tz),
     schedule_interval=None,
@@ -190,10 +199,5 @@ with DAG(
         task_id='train_fraud_model',
         python_callable=run_fraud_training
     )
-    # Keeping BashOperator as alternative (commented out)
-    # train_fraud_model_bash = BashOperator(
-    #     task_id='train_fraud_model_bash',
-    #     bash_command='python vertex_ai/training_pipeline.py',
-    #     cwd=ML_TRAINING_PATH
-    # )
+    
     create_dataset_task >> create_training_metrics_table_task >> create_predictions_table_task >> train_fraud_model_task

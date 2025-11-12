@@ -50,9 +50,12 @@ class FraudDetectionTrainer:
             id_cols.append('source_file')
         feature_cols = [col for col in df.columns if col not in id_cols]
 
+        flag_cols = [col for col in df.columns if col.startswith('flag_')]
+
         # Get all columns except IDs
         nonid_feature_cols = [col for col in df.columns if col not in id_cols]
 
+        print(f"Flag columns: {flag_cols}")
         print(f"ID columns: {id_cols}")
         print(f"Non-ID feature columns: {nonid_feature_cols}")
 
@@ -83,8 +86,14 @@ class FraudDetectionTrainer:
                 'transaction_id': [f"txn_{i}" for i in range(len(df))],
                 'tag_plate_number': ['unknown'] * len(df),
             })
+
+        if flag_cols:
+            for flag_col in flag_cols:
+                df_ids[flag_col] = df[flag_col].values
         
-        return X_scaled, scaler, feature_cols, df[id_cols]
+        print(f"DF IDs: {df[id_cols].head()}")
+        
+        return X_scaled, scaler, feature_cols, df_ids
     
     def train_isolation_forest(self, X_scaled, contamination=0.01):
         """Train Isolation Forest for anomaly detection"""
@@ -187,6 +196,7 @@ class FraudDetectionTrainer:
         # Keep only needed columns
         columns = ['transaction_id', 'tag_plate_number',
                 'last_updated', 'source_file',
+                'flag_is_weekend', 'flag_is_out_of_state', 'flag_is_vehicle_type_gt2', 'flag_is_holiday',
                 'is_anomaly', 'anomaly_score', 'prediction_timestamp']
         final_df = results_df[[col for col in columns if col in results_df.columns]]
         
