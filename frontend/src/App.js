@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Chart, registerables } from 'chart.js';
 Chart.register(...registerables);
 
+
+
 // --- Mock Data ---
 const rawData = [
     { 
@@ -125,6 +127,45 @@ const rawData = [
         riskScore: 31 
     },
 ];
+const apiUrl = process.env.REACT_APP_API_URL;
+
+const fetchTransactions = async () => {
+    try {
+        console.log(import.meta.env);
+        const response = await fetch(`${apiUrl}/api/transactions`);
+        if (!response.ok) throw new Error('Failed to fetch data');
+        const { data } = await response.json(); // extract array
+        return data || [];
+    } catch (err) {
+        console.error(err);
+        return [];
+    }
+};
+
+const fetchMonthlyChartData = async () => {
+    try {
+        const response = await fetch(`${apiUrl}/api/charts/monthly`);
+        if (!response.ok) throw new Error('Failed to fetch chart data');
+        const { data } = await response.json();
+        return data || [];
+    } catch (err) {
+        console.error(err);
+        return [];
+    }
+};
+
+const fetchCategoryChartData = async () => {
+    try {
+        const response = await fetch(`${apiUrl}/api/charts/category`);
+        if (!response.ok) throw new Error('Failed to fetch category chart data');
+        const { data } = await response.json();
+        return data || [];
+    } catch (err) {
+        console.error(err);
+        return [];
+    }
+};
+
 
 /*
 const recentAlerts = [
@@ -225,8 +266,71 @@ const defaultChartOptions = {
 
 const BarChart = () => {
     const chartRef = useRef(null);
+    const chartInstanceRef = useRef(null);
+    const [chartData, setChartData] = useState(null);
+    const [loading, setLoading] = useState(true);
+
     useEffect(() => {
+        const loadChartData = async () => {
+            setLoading(true);
+            try {
+                const data = await fetchMonthlyChartData();
+                if (data && data.length > 0) {
+                    // Extract labels and data
+                    // Check if data spans multiple years - if so, include year in labels
+                    const uniqueYears = new Set(data.map(item => item.year));
+                    const showYear = uniqueYears.size > 1;
+                    
+                    const labels = data.map(item => {
+                        if (showYear) {
+                            // Show "Apr 2025" format when multiple years
+                            return item.month;
+                        } else {
+                            // Show just "Apr" when single year
+                            const monthParts = item.month.split(' ');
+                            return monthParts[0];
+                        }
+                    });
+                    const totalTransactions = data.map(item => item.total_transactions || 0);
+                    const fraudAlerts = data.map(item => item.fraud_alerts || 0);
+                    
+                    setChartData({
+                        labels,
+                        totalTransactions,
+                        fraudAlerts
+                    });
+                } else {
+                    // Default empty data
+                    setChartData({
+                        labels: [],
+                        totalTransactions: [],
+                        fraudAlerts: []
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading chart data:', error);
+                setChartData({
+                    labels: [],
+                    totalTransactions: [],
+                    fraudAlerts: []
+                });
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadChartData();
+    }, []);
+
+    useEffect(() => {
+        if (!chartRef.current || !chartData || loading) return;
+
         const ctx = chartRef.current.getContext('2d');
+        
+        // Destroy existing chart if it exists
+        if (chartInstanceRef.current) {
+            chartInstanceRef.current.destroy();
+        }
         
         const gradient1 = ctx.createLinearGradient(0, 0, 0, 400);
         gradient1.addColorStop(0, 'rgba(20, 184, 166, 0.8)');
@@ -236,34 +340,38 @@ const BarChart = () => {
         gradient2.addColorStop(0, 'rgba(239, 68, 68, 0.8)');
         gradient2.addColorStop(1, 'rgba(239, 68, 68, 0.2)');
         
+        const datasets = [
+            {
+                label: 'Total Transactions',
+                data: chartData.totalTransactions,
+                backgroundColor: gradient1,
+                borderColor: 'rgba(20, 184, 166, 1)',
+                borderWidth: 2,
+                borderRadius: 8,
+                hoverBackgroundColor: 'rgba(20, 184, 166, 1)',
+                hoverBorderColor: 'rgba(45, 212, 191, 1)',
+                hoverBorderWidth: 3
+            }
+        ];
+
+        // Always show fraud alerts dataset, even if all zeros (ready for when fraud detection is implemented)
+        datasets.push({
+            label: 'Fraud Alerts',
+            data: chartData.fraudAlerts,
+            backgroundColor: gradient2,
+            borderColor: 'rgba(239, 68, 68, 1)',
+            borderWidth: 2,
+            borderRadius: 8,
+            hoverBackgroundColor: 'rgba(239, 68, 68, 1)',
+            hoverBorderColor: 'rgba(248, 113, 113, 1)',
+            hoverBorderWidth: 3
+        });
+        
         const chart = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: ['May', 'June', 'July', 'Aug', 'Sep', 'Oct'],
-                datasets: [
-                    {
-                        label: 'Total Transactions',
-                        data: [15250, 17800, 19300, 18500, 21000, 22500],
-                        backgroundColor: gradient1,
-                        borderColor: 'rgba(20, 184, 166, 1)',
-                        borderWidth: 2,
-                        borderRadius: 8,
-                        hoverBackgroundColor: 'rgba(20, 184, 166, 1)',
-                        hoverBorderColor: 'rgba(45, 212, 191, 1)',
-                        hoverBorderWidth: 3
-                    },
-                    {
-                        label: 'Fraud Alerts',
-                        data: [120, 190, 250, 220, 300, 280],
-                        backgroundColor: gradient2,
-                        borderColor: 'rgba(239, 68, 68, 1)',
-                        borderWidth: 2,
-                        borderRadius: 8,
-                        hoverBackgroundColor: 'rgba(239, 68, 68, 1)',
-                        hoverBorderColor: 'rgba(248, 113, 113, 1)',
-                        hoverBorderWidth: 3
-                    }
-                ]
+                labels: chartData.labels,
+                datasets: datasets
             },
             options: {
                 ...defaultChartOptions,
@@ -273,26 +381,111 @@ const BarChart = () => {
                 }
             }
         });
-        return () => chart.destroy();
-    }, []);
+
+        chartInstanceRef.current = chart;
+
+        return () => {
+            if (chartInstanceRef.current) {
+                chartInstanceRef.current.destroy();
+                chartInstanceRef.current = null;
+            }
+        };
+    }, [chartData, loading]);
+
+    if (loading) {
+        return (
+            <div className="h-80 flex items-center justify-center">
+                <div className="text-gray-400">Loading chart data...</div>
+            </div>
+        );
+    }
+
+    if (!chartData || !chartData.labels || chartData.labels.length === 0) {
+        return (
+            <div className="h-80 flex items-center justify-center">
+                <div className="text-gray-400">No chart data available</div>
+            </div>
+        );
+    }
+
     return <div className="h-80"><canvas ref={chartRef}></canvas></div>;
 };
 
 const CategoryChart = () => {
     const chartRef = useRef(null);
+    const chartInstanceRef = useRef(null);
+    const [chartData, setChartData] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    // Color mapping for different fraud categories
+    const getCategoryColor = (category, index) => {
+        const colorMap = {
+            'Holiday': 'rgba(239, 68, 68, 0.8)', // Red
+            'Out of State': 'rgba(14, 165, 233, 0.8)', // Blue
+            'Vehicle Type > 2': 'rgba(168, 85, 247, 0.8)', // Purple
+            'Weekend': 'rgba(236, 72, 153, 0.8)' // Pink
+        };
+        return colorMap[category] || `rgba(${100 + index * 50}, ${150 + index * 30}, ${200 + index * 20}, 0.8)`;
+    };
+
     useEffect(() => {
+        const loadChartData = async () => {
+            setLoading(true);
+            try {
+                const data = await fetchCategoryChartData();
+                if (data && data.length > 0) {
+                    const labels = data.map(item => item.category);
+                    const counts = data.map(item => item.count);
+                    const colors = labels.map((label, index) => getCategoryColor(label, index));
+                    
+                    setChartData({
+                        labels,
+                        counts,
+                        colors
+                    });
+                } else {
+                    setChartData({
+                        labels: [],
+                        counts: [],
+                        colors: []
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading category chart data:', error);
+                setChartData({
+                    labels: [],
+                    counts: [],
+                    colors: []
+                });
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadChartData();
+    }, []);
+
+    useEffect(() => {
+        if (!chartRef.current || !chartData || loading) return;
+
+        // Destroy existing chart if it exists
+        if (chartInstanceRef.current) {
+            chartInstanceRef.current.destroy();
+        }
+
+        // Don't render chart if no data
+        if (chartData.labels.length === 0) {
+            return;
+        }
+
         const chart = new Chart(chartRef.current, {
             type: 'doughnut',
             data: {
-                labels: ['Toll Evasion', 'Card Skimming', 'Account Takeover'],
+                labels: chartData.labels,
                 datasets: [{
                     label: ' Incidents',
-                    data: [65, 20, 15],
-                    backgroundColor: [
-                        'rgba(14, 165, 233, 0.8)',
-                        'rgba(168, 85, 247, 0.8)',
-                        'rgba(236, 72, 153, 0.8)'
-                    ],
+                    data: chartData.counts,
+                    backgroundColor: chartData.colors,
                     borderColor: 'rgba(15, 23, 42, 0.8)',
                     borderWidth: 3,
                     hoverOffset: 20,
@@ -327,7 +520,7 @@ const CategoryChart = () => {
                                 let label = context.label || '';
                                 let value = context.parsed || 0;
                                 let total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                let percentage = ((value / total) * 100).toFixed(1);
+                                let percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
                                 return `${label}: ${value} (${percentage}%)`;
                             }
                         }
@@ -335,8 +528,33 @@ const CategoryChart = () => {
                 }
             }
         });
-        return () => chart.destroy();
-    }, []);
+
+        chartInstanceRef.current = chart;
+
+        return () => {
+            if (chartInstanceRef.current) {
+                chartInstanceRef.current.destroy();
+                chartInstanceRef.current = null;
+            }
+        };
+    }, [chartData, loading]);
+
+    if (loading) {
+        return (
+            <div className="h-80 w-full flex justify-center items-center">
+                <div className="text-gray-400">Loading chart data...</div>
+            </div>
+        );
+    }
+
+    if (!chartData || chartData.labels.length === 0) {
+        return (
+            <div className="h-80 w-full flex justify-center items-center">
+                <div className="text-gray-400">No fraud data available</div>
+            </div>
+        );
+    }
+
     return <div className="h-80 w-full flex justify-center items-center"><canvas ref={chartRef}></canvas></div>;
 };
 
@@ -551,7 +769,7 @@ const DashboardView = ({ setActiveView }) => {
                                         </div>
                                         <p className="text-sm text-white font-medium mb-1">{txn.category}</p>
                                         <div className="flex items-center gap-3 text-xs text-gray-400">
-                                            <span>{txn.tagPlate}</span>
+                                            <span>{txn.tag_plate_number || txn.tagPlate || '-'}</span>
                                             <span>•</span>
                                             <span>${txn.amount.toFixed(2)}</span>
                                             <span>•</span>
@@ -601,7 +819,25 @@ const DashboardView = ({ setActiveView }) => {
 const DataView = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
-    const [transactionData, setTransactionData] = useState(rawData);
+    const [transactionData, setTransactionData] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 15; // rows per page
+
+    useEffect(() => {
+        const loadData = async () => {
+            setLoading(true);
+            const data = await fetchTransactions();
+            setTransactionData(data);
+            setLoading(false);
+        };
+        loadData();
+    }, []);
+
+    // Reset to page 1 when search or filter changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filterStatus]);
 
     const handleStatusChange = (transactionId, newStatus) => {
         setTransactionData(prevData => 
@@ -613,13 +849,89 @@ const DataView = () => {
         );
     };
 
+    // Helper function to handle null/undefined values
+    const formatValue = (value) => {
+        if (value === null || value === undefined || value === '') {
+            return '-';
+        }
+        return value;
+    };
+
+    // Helper function to format dates (MM/DD/YYYY)
+    const formatDate = (dateValue) => {
+        if (dateValue === null || dateValue === undefined || dateValue === '' || dateValue === '-') {
+            return '-';
+        }
+        
+        try {
+            const date = new Date(dateValue);
+            if (isNaN(date.getTime())) {
+                return '-'; // Return '-' if invalid date
+            }
+            
+            // Format as MM/DD/YYYY
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${month}/${day}/${year}`;
+        } catch (e) {
+            return '-'; // Return '-' if parsing fails
+        }
+    };
+
+    // Helper function to format date with time (MM/DD/YYYY HH:MM AM/PM)
+    const formatDateTime = (dateValue) => {
+        if (dateValue === null || dateValue === undefined || dateValue === '' || dateValue === '-') {
+            return '-';
+        }
+        
+        try {
+            const date = new Date(dateValue);
+            if (isNaN(date.getTime())) {
+                return '-'; // Return '-' if invalid date
+            }
+            
+            // Format as MM/DD/YYYY HH:MM AM/PM
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const year = date.getFullYear();
+            
+            // Convert to 12-hour format with AM/PM
+            let hours = date.getHours();
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12; // the hour '0' should be '12'
+            
+            return `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
+        } catch (e) {
+            return '-'; // Return '-' if parsing fails
+        }
+    };
+
     const filteredData = transactionData.filter(row => {
-        const matchesSearch = row.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            row.category.toLowerCase().includes(searchTerm.toLowerCase());
+        const id = row.id || '';
+        const category = row.category || '';
+        const tagPlate = row.tag_plate_number || row.tagPlate || '';
+        const matchesSearch = id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            tagPlate.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesFilter = filterStatus === 'all' || row.status === filterStatus;
         return matchesSearch && matchesFilter;
     });
 
+    // Slice the filtered data for the current page
+    const paginatedData = filteredData.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
+
+    // Total pages
+    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+
+
+
+    if (loading) return <div>Loading transactions...</div>;
     return (
         <div className="space-y-6">
             {/* Search and Filter Bar */}
@@ -685,102 +997,174 @@ const DataView = () => {
             {/* Data Table */}
             <div className="bg-gradient-to-br from-slate-800/80 to-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-2xl shadow-xl overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-sm table-fixed">
+                    <table className="w-full text-base table-fixed">
                         <thead className="bg-slate-900/50 border-b border-slate-700">
                             <tr>
-                                <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider w-[10%]">Tag/Plate Number</th>
-                                <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider w-[9%]">Transaction Date</th>
-                                <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider w-[7%]">Agency</th>
-                                <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider w-[8%]">Entry Time</th>
-                                <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider w-[9%]">Entry Plaza</th>
-                                <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider w-[8%]">Exit Time</th>
-                                <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider w-[9%]">Exit Plaza</th>
-                                <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider w-[9%]">Amount</th>
-                                <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider w-[11%]">Status</th>
-                                <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider w-[13%]">Category</th>
+                                <th scope="col" className="px-4 py-4 text-left text-sm font-semibold text-gray-400 uppercase tracking-wider w-[11%]">Tag/Plate Number</th>
+                                <th scope="col" className="px-4 py-4 text-left text-sm font-semibold text-gray-400 uppercase tracking-wider w-[9%]">Transaction Date</th>
+                                <th scope="col" className="px-4 py-4 text-left text-sm font-semibold text-gray-400 uppercase tracking-wider w-[7%]">Agency</th>
+                                <th scope="col" className="px-4 py-4 text-left text-sm font-semibold text-gray-400 uppercase tracking-wider w-[12%]">Entry Time</th>
+                                <th scope="col" className="px-4 py-4 text-left text-sm font-semibold text-gray-400 uppercase tracking-wider w-[6%]">Entry Plaza</th>
+                                <th scope="col" className="px-4 py-4 text-left text-sm font-semibold text-gray-400 uppercase tracking-wider w-[12%]">Exit Time</th>
+                                <th scope="col" className="px-4 py-4 text-left text-sm font-semibold text-gray-400 uppercase tracking-wider w-[6%]">Exit Plaza</th>
+                                <th scope="col" className="px-4 py-4 text-left text-sm font-semibold text-gray-400 uppercase tracking-wider w-[9%]">Amount</th>
+                                <th scope="col" className="px-4 py-4 text-left text-sm font-semibold text-gray-400 uppercase tracking-wider w-[11%]">Status</th>
+                                <th scope="col" className="px-4 py-4 text-left text-sm font-semibold text-gray-400 uppercase tracking-wider w-[17%]">Category</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-700/50">
-                            {filteredData.map((row, index) => (
-                                <tr 
-                                    key={row.id} 
-                                    className="hover:bg-slate-700/30 transition-colors duration-150 group"
-                                >
-                                    <td className="px-3 py-3 whitespace-nowrap">
-                                        <span className="font-mono text-gray-100 font-medium">{row.tagPlate}</span>
-                                    </td>
-                                    <td className="px-3 py-3 whitespace-nowrap text-gray-300">
-                                        {row.transactionDate}
-                                    </td>
-                                    <td className="px-3 py-3 whitespace-nowrap">
-                                        <span className={`inline-block px-2 py-0.5 rounded-lg text-xs font-semibold ${
-                                            row.agency === 'PANYNJ' ? 'bg-blue-500/20 text-blue-400 ring-1 ring-blue-500/30' :
-                                            'bg-purple-500/20 text-purple-400 ring-1 ring-purple-500/30'
-                                        }`}>
-                                            {row.agency}
-                                        </span>
-                                    </td>
-                                    <td className="px-3 py-3 whitespace-nowrap text-gray-300">
-                                        {row.entryTime}
-                                    </td>
-                                    <td className="px-3 py-3 whitespace-nowrap text-gray-300">
-                                        {row.entryPlaza}
-                                    </td>
-                                    <td className="px-3 py-3 whitespace-nowrap text-gray-300">
-                                        {row.exitTime}
-                                    </td>
-                                    <td className="px-3 py-3 whitespace-nowrap text-gray-300">
-                                        {row.exitPlaza}
-                                    </td>
-                                    <td className="px-3 py-3 whitespace-nowrap">
-                                        <span className="font-semibold text-white">${row.amount.toFixed(2)}</span>
-                                    </td>
-                                    <td className="px-3 py-3 whitespace-nowrap">
-                                        <select
-                                            value={row.status}
-                                            onChange={(e) => handleStatusChange(row.id, e.target.value)}
-                                            className={`px-2 py-1 rounded-lg text-xs font-semibold border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-0 ${
-                                                row.status === 'Investigating' ? 'bg-red-500/20 text-red-400 focus:ring-red-500/50' :
-                                                row.status === 'Flagged' ? 'bg-amber-500/20 text-amber-400 focus:ring-amber-500/50' :
-                                                'bg-emerald-500/20 text-emerald-400 focus:ring-emerald-500/50'
-                                            }`}
-                                        >
-                                            <option value="Flagged" className="bg-slate-800 text-amber-400">Flagged</option>
-                                            <option value="Investigating" className="bg-slate-800 text-red-400">Investigating</option>
-                                            <option value="Resolved" className="bg-slate-800 text-emerald-400">Resolved</option>
-                                        </select>
-                                    </td>
-                                    <td className="px-3 py-3 whitespace-nowrap">
-                                        <span className={`inline-block px-2 py-0.5 rounded-lg text-xs font-semibold ${
-                                            row.category === 'Account Takeover' ? 'bg-pink-500/20 text-pink-400 ring-1 ring-pink-500/30' :
-                                            row.category === 'Card Skimming' ? 'bg-purple-500/20 text-purple-400 ring-1 ring-purple-500/30' :
-                                            'bg-cyan-500/20 text-cyan-400 ring-1 ring-cyan-500/30'
-                                        }`}>
-                                            {row.category}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))}
+                            {paginatedData.map((row, index) => {
+                                const tagPlate = formatValue(row.tag_plate_number || row.tagPlate || row.tag_plate || row.plate_number);
+                                const transactionDate = formatDate(row.transaction_date);
+                                const agency = formatValue(row.agency);
+                                const entryTime = formatDateTime(row.entryTime || row.entry_time);
+                                const entryPlaza = formatValue(row.entryPlaza || row.entry_plaza);
+                                const exitTime = formatDateTime(row.exitTime || row.exit_time);
+                                const exitPlaza = formatValue(row.exitPlaza || row.exit_plaza);
+                                const amount = row.amount !== null && row.amount !== undefined ? `$${parseFloat(row.amount).toFixed(2)}` : '-';
+                                const status = formatValue(row.status);
+                                const category = formatValue(row.category || row.vehicle_class_category);
+
+                                return (
+                                    <tr 
+                                        key={row.id || index} 
+                                        className="hover:bg-slate-700/30 transition-colors duration-150 group"
+                                    >
+                                        <td className="px-4 py-4 whitespace-nowrap">
+                                            <span className="font-mono text-gray-100 font-medium text-base">{tagPlate}</span>
+                                        </td>
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                            {transactionDate}
+                                        </td>
+                                        <td className="px-4 py-4 whitespace-nowrap">
+                                            {agency !== '-' ? (
+                                                <span className={`inline-block px-2 py-1 rounded-lg text-xs font-semibold ${
+                                                    agency === 'PANYNJ' ? 'bg-blue-500/20 text-blue-400 ring-1 ring-blue-500/30' :
+                                                    'bg-purple-500/20 text-purple-400 ring-1 ring-purple-500/30'
+                                                }`}>
+                                                    {agency}
+                                                </span>
+                                            ) : (
+                                                <span className="text-gray-400 text-base">-</span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                            {entryTime}
+                                        </td>
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                            {entryPlaza}
+                                        </td>
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                            {exitTime}
+                                        </td>
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                            {exitPlaza}
+                                        </td>
+                                        <td className="px-4 py-4 whitespace-nowrap">
+                                            <span className="font-semibold text-white text-base">{amount}</span>
+                                        </td>
+                                        <td className="px-4 py-4 whitespace-nowrap">
+                                            {status !== '-' ? (
+                                                <select
+                                                    value={status}
+                                                    onChange={(e) => handleStatusChange(row.id, e.target.value)}
+                                                    className={`px-2 py-1.5 rounded-lg text-xs font-semibold border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-0 ${
+                                                        status === 'Investigating' ? 'bg-red-500/20 text-red-400 focus:ring-red-500/50' :
+                                                        status === 'Flagged' ? 'bg-amber-500/20 text-amber-400 focus:ring-amber-500/50' :
+                                                        'bg-emerald-500/20 text-emerald-400 focus:ring-emerald-500/50'
+                                                    }`}
+                                                >
+                                                    <option value="Flagged" className="bg-slate-800 text-amber-400">Flagged</option>
+                                                    <option value="Investigating" className="bg-slate-800 text-red-400">Investigating</option>
+                                                    <option value="Resolved" className="bg-slate-800 text-emerald-400">Resolved</option>
+                                                </select>
+                                            ) : (
+                                                <span className="text-gray-400 text-base">-</span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-4 whitespace-nowrap">
+                                            {category !== '-' ? (
+                                                <span className={`inline-block px-2 py-1 rounded-lg text-xs font-semibold ${
+                                                    category === 'Account Takeover' ? 'bg-pink-500/20 text-pink-400 ring-1 ring-pink-500/30' :
+                                                    category === 'Card Skimming' ? 'bg-purple-500/20 text-purple-400 ring-1 ring-purple-500/30' :
+                                                    'bg-cyan-500/20 text-cyan-400 ring-1 ring-cyan-500/30'
+                                                }`}>
+                                                    {category}
+                                                </span>
+                                            ) : (
+                                                <span className="text-gray-400 text-base">-</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
                 
                 {/* Pagination */}
-                <div className="bg-slate-900/50 px-6 py-4 border-t border-slate-700 flex items-center justify-between">
+                <div className="bg-slate-900/50 px-6 py-4 border-t border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="text-sm text-gray-400">
-                        Showing <span className="font-semibold text-white">{filteredData.length}</span> of <span className="font-semibold text-white">{transactionData.length}</span> transactions
+                        Showing <span className="font-semibold text-white">
+                            {paginatedData.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}
+                        </span> to <span className="font-semibold text-white">
+                            {Math.min(currentPage * itemsPerPage, filteredData.length)}
+                        </span> of <span className="font-semibold text-white">{filteredData.length}</span> transactions
                     </div>
-                    <div className="flex space-x-2">
-                        <button className="px-4 py-2 bg-slate-700/50 text-gray-400 rounded-lg text-sm font-medium hover:bg-slate-700 transition-colors">
+                    <div className="flex items-center space-x-2">
+                        <button 
+                            onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+                            disabled={currentPage === 1 || totalPages === 0}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                                currentPage === 1 || totalPages === 0
+                                    ? 'bg-slate-700/30 text-gray-500 cursor-not-allowed' 
+                                    : 'bg-slate-700/50 text-gray-300 hover:bg-slate-700 hover:text-white'
+                            }`}
+                        >
                             Previous
                         </button>
-                        <button className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium">
-                            1
-                        </button>
-                        <button className="px-4 py-2 bg-slate-700/50 text-gray-400 rounded-lg text-sm font-medium hover:bg-slate-700 transition-colors">
-                            2
-                        </button>
-                        <button className="px-4 py-2 bg-slate-700/50 text-gray-400 rounded-lg text-sm font-medium hover:bg-slate-700 transition-colors">
+
+                        {totalPages > 0 && (
+                            <div className="flex space-x-1">
+                                {[...Array(Math.min(totalPages, 10))].map((_, idx) => {
+                                    // Show page numbers with ellipsis for large page counts
+                                    let pageNum;
+                                    if (totalPages <= 10) {
+                                        pageNum = idx + 1;
+                                    } else if (currentPage <= 5) {
+                                        pageNum = idx + 1;
+                                    } else if (currentPage >= totalPages - 4) {
+                                        pageNum = totalPages - 9 + idx;
+                                    } else {
+                                        pageNum = currentPage - 5 + idx;
+                                    }
+
+                                    return (
+                                        <button
+                                            key={idx}
+                                            onClick={() => setCurrentPage(pageNum)}
+                                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                                                currentPage === pageNum 
+                                                    ? 'bg-teal-600 text-white ring-2 ring-teal-500/50' 
+                                                    : 'bg-slate-700/50 text-gray-400 hover:bg-slate-700 hover:text-white'
+                                            }`}
+                                        >
+                                            {pageNum}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        <button 
+                            onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+                            disabled={currentPage === totalPages || totalPages === 0}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                                currentPage === totalPages || totalPages === 0
+                                    ? 'bg-slate-700/30 text-gray-500 cursor-not-allowed' 
+                                    : 'bg-slate-700/50 text-gray-300 hover:bg-slate-700 hover:text-white'
+                            }`}
+                        >
                             Next
                         </button>
                     </div>

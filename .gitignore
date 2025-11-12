@@ -2,7 +2,6 @@
 documents/**/*
 !documents/.gitkeep
 docs/
-backend/**/*
 !backend/.gitkeep
 
 # Specific files to ignore
@@ -50,7 +49,8 @@ htmlcov/
 venv/
 env/
 ENV/
-
+*venv/
+*keys/
 # Environment variables
 .env
 .env.local
