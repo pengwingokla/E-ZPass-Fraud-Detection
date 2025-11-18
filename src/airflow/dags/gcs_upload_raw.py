@@ -120,11 +120,20 @@ def normalize_columns(**context):
                 if col in df.columns:
                     df[col] = pd.to_datetime(df[col], errors='coerce').dt.strftime('%Y-%m-%d')
             
-            # Handle timestamps (MM/DD/YYYY HH:MM:SS format)
-            timestamp_columns = ['entry_time', 'exit_time']
-            for col in timestamp_columns:
-                if col in df.columns:
-                    df[col] = pd.to_datetime(df[col], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S')
+            # Handle timestamps - entry_time and exit_time are time-only (HH:MM:SS)
+            # Combine them with transaction_date to create full timestamps
+            if 'transaction_date' in df.columns:
+                for time_col in ['entry_time', 'exit_time']:
+                    if time_col in df.columns:
+                        # Replace '-' with NaN for empty time values
+                        df[time_col] = df[time_col].replace('-', pd.NA)
+                        
+                        # Combine transaction_date with time to create timestamp
+                        # Create a combined string: transaction_date + ' ' + time
+                        combined = df['transaction_date'].astype(str) + ' ' + df[time_col].astype(str)
+                        
+                        # Parse as datetime
+                        df[time_col] = pd.to_datetime(combined, errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S')
             
             # Convert numeric columns
             numeric_columns = ['amount', 'balance']
