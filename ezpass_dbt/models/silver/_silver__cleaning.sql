@@ -14,8 +14,19 @@ cleaned AS (
         SAFE.PARSE_DATE('%Y-%m-%d', posting_date) as posting_date,
         
         -- Convert timestamps (STRING YYYY-MM-DD HH:MM:SS → TIMESTAMP)
-        SAFE.PARSE_TIMESTAMP('%Y-%m-%d %H:%M:%S', entry_time) as entry_time,
-        SAFE.PARSE_TIMESTAMP('%Y-%m-%d %H:%M:%S', exit_time) as exit_time,
+        -- Treat midnight (00:00:00) as NULL since it's likely a placeholder
+        CASE 
+            WHEN SAFE.PARSE_TIMESTAMP('%Y-%m-%d %H:%M:%S', entry_time) IS NOT NULL
+                 AND FORMAT_TIMESTAMP('%H:%M:%S', SAFE.PARSE_TIMESTAMP('%Y-%m-%d %H:%M:%S', entry_time)) = '00:00:00'
+            THEN NULL
+            ELSE SAFE.PARSE_TIMESTAMP('%Y-%m-%d %H:%M:%S', entry_time)
+        END as entry_time,
+        CASE 
+            WHEN SAFE.PARSE_TIMESTAMP('%Y-%m-%d %H:%M:%S', exit_time) IS NOT NULL
+                 AND FORMAT_TIMESTAMP('%H:%M:%S', SAFE.PARSE_TIMESTAMP('%Y-%m-%d %H:%M:%S', exit_time)) = '00:00:00'
+            THEN NULL
+            ELSE SAFE.PARSE_TIMESTAMP('%Y-%m-%d %H:%M:%S', exit_time)
+        END as exit_time,
         
         -- Clean and standardize text fields (replace '-' with NULL)
         NULLIF(UPPER(TRIM(tag_plate_number)), '-') as tag_plate_number,

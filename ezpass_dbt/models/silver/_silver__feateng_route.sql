@@ -18,20 +18,33 @@ instate_plazas AS (
     FROM distance_lookup
 ),
 
--- Add route sequence features
 route_sequence AS (
     SELECT
         *,
         
-        -- Previous exit plaza for this driver (useful for route pattern analysis)
-        -- Replace NULL with 'Unknown'
-        COALESCE(
-            LAG(exit_plaza) OVER (
-                PARTITION BY tag_plate_number 
-                ORDER BY transaction_date, COALESCE(entry_time, TIMESTAMP('1900-01-01 00:00:00'))
-            ),
-            'Unknown'
-        ) as exit_plaza_previous
+        -- Previous entry plaza
+        LAG(entry_plaza) OVER (
+            PARTITION BY tag_plate_number 
+            ORDER BY exit_time ASC NULLS LAST
+        ) as entry_plaza_previous,
+        
+        -- Previous exit plaza
+        LAG(exit_plaza) OVER (
+            PARTITION BY tag_plate_number 
+            ORDER BY exit_time ASC NULLS LAST
+        ) as exit_plaza_previous,
+        
+        -- Previous entry time
+        LAG(entry_time) OVER (
+            PARTITION BY tag_plate_number 
+            ORDER BY exit_time ASC NULLS LAST
+        ) as entry_time_previous,
+        
+        -- Previous exit time
+        LAG(exit_time) OVER (
+            PARTITION BY tag_plate_number 
+            ORDER BY exit_time ASC NULLS LAST
+        ) as exit_time_previous
 
     FROM base_features
 ),
@@ -43,9 +56,9 @@ route_features AS (
         
         -- Route from previous exit to current exit
         CONCAT(
-            COALESCE(exit_plaza, 'Unknown'), 
+            COALESCE(exit_plaza_previous, 'Unknown'), 
             ' to ', 
-            exit_plaza_previous
+            exit_plaza
         ) as plaza_route
 
     FROM route_sequence
@@ -69,7 +82,108 @@ check_route AS (
         END as route_instate
         
     FROM route_features rf
+),
+
+-- Add distance from previous exit plaza to current exit plaza
+distance_features AS (
+    SELECT
+        cr.*,
+        dl.expected_travel_distance_miles as distance_miles
+    FROM check_route cr
+    LEFT JOIN distance_lookup dl
+        ON cr.exit_plaza_previous = dl.origin_plaza
+        AND cr.exit_plaza = dl.destination_plaza
+),
+
+-- Calculate velocity and impossible travel features
+velocity_features AS (
+    SELECT
+        *,
+        
+        -- Time since last transaction (in minutes)
+        TIMESTAMP_DIFF(
+            exit_time, 
+            exit_time_previous, -- this is the entry time
+            MINUTE
+        ) as travel_time_minutes,
+        
+        -- Calculate implied speed (mph)
+        -- Only calculate if we have valid distance and time data
+        CASE 
+            WHEN distance_miles IS NOT NULL 
+                 AND exit_time IS NOT NULL 
+                 AND exit_time_previous IS NOT NULL
+                 AND TIMESTAMP_DIFF(exit_time, exit_time_previous, MINUTE) > 0
+            THEN (distance_miles / TIMESTAMP_DIFF(exit_time, exit_time_previous, MINUTE)) * 60
+            ELSE NULL
+        END as speed_mph,
+        
+        -- Minimum required travel time at reasonable speed (80 mph)
+        CASE 
+            WHEN distance_miles IS NOT NULL 
+                 AND distance_miles > 0
+            THEN (distance_miles / 80.0) * 60  -- Convert hours to minutes
+            ELSE NULL
+        END as min_required_travel_time_minutes,
+        
+        -- Flag for impossible travel (speed > 100 mph OR time less than required OR negative time)
+        CASE 
+            WHEN distance_miles IS NULL 
+                OR exit_time IS NULL 
+                OR exit_time_previous IS NULL
+            THEN NULL
+            -- Check for zero or negative time difference (impossible - time travel or out of order)
+            WHEN TIMESTAMP_DIFF(exit_time, exit_time_previous, MINUTE) <= 0
+            THEN TRUE
+            -- Check if travel time is less than physically possible at 100 mph
+            WHEN TIMESTAMP_DIFF(exit_time, exit_time_previous, MINUTE) < 
+                (distance_miles / 100.0) * 60
+            THEN TRUE
+            -- Check if implied speed exceeds 100 mph
+            WHEN (distance_miles / TIMESTAMP_DIFF(exit_time, exit_time_previous, MINUTE)) * 60 > 100
+            THEN TRUE
+            ELSE FALSE
+        END as is_impossible_travel,
+        
+        -- Flag for rapid succession (< 5 minutes between transactions)
+        CASE 
+            WHEN exit_time IS NULL OR exit_time_previous IS NULL
+            THEN NULL
+            WHEN TIMESTAMP_DIFF(exit_time, exit_time_previous, MINUTE) < 5
+            THEN TRUE
+            ELSE FALSE
+        END as is_rapid_succession,
+        
+        -- Flag for overlapping transactions (entry time before previous exit time)
+        CASE
+            WHEN entry_time IS NOT NULL
+                AND exit_time_previous IS NOT NULL
+                AND entry_time < exit_time_previous
+            THEN TRUE -- TRUE if this transaction's entry time started before previous transaction's exit time
+            WHEN entry_time IS NOT NULL 
+                AND exit_time_previous IS NOT NULL
+            THEN FALSE -- FALSE if both times exist but there's no overlap
+            ELSE NULL -- NULL if either entry time or exit time previous is NULL
+        END as is_overlapping_journey,
+        
+        -- Absolute overlap duration
+        CASE 
+            WHEN entry_time < exit_time_previous
+            THEN TIMESTAMP_DIFF(exit_time_previous, entry_time, MINUTE)
+            ELSE 0
+        END as overlapping_journey_duration_minutes,
+
+        -- Flag for possible tag cloning (overlap > 5 minutes)
+        CASE
+            WHEN entry_time < exit_time_previous
+                 AND TIMESTAMP_DIFF(exit_time_previous, entry_time, MINUTE) > 5
+            THEN TRUE
+            ELSE FALSE
+        END as flag_possible_cloning
+
+    FROM distance_features
 )
 
-SELECT * FROM check_route
+
+SELECT * FROM velocity_features
 

@@ -37,7 +37,7 @@ new_features AS (
         CASE 
             WHEN EXTRACT(DAYOFWEEK FROM transaction_date) IN (1, 7) THEN 'Weekend'
             ELSE 'Weekday'
-        END as is_weekend,
+        END as weekend_or_weekday,
 
         -- TIME OF DAY FEATURES
         -- Entry time of day
