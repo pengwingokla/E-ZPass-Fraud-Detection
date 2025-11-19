@@ -96,11 +96,12 @@ SELECT
     entry_hour,
     exit_hour,
     vehicle_type_name,
-    is_commercial_vehicle,
 
     -- Flags
-    is_weekend,
-    is_holiday,
+    flag_vehicle_type,
+    flag_is_weekend,
+    flag_is_holiday,
+    flag_outstate,
     -- is_missing_entry_plaza,
     -- is_missing_exit_plaza,
     -- is_missing_entry_time,

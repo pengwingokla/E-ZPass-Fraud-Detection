@@ -28,9 +28,13 @@ flagged AS (
         -- Checks if a given date is a weekend (Saturday or Sunday)
         CASE weekend_or_weekday
             WHEN 'Weekend' THEN TRUE
-            WHEN 'Weekday' THEN FALSE
-            ELSE NULL
-        END as is_weekend,
+            ELSE FALSE
+        END as flag_is_weekend,
+
+        CASE state_name
+            WHEN 'NJ' THEN FALSE
+            ELSE TRUE
+        END as flag_outstate,
 
         -- Checks if the provided transaction_date is considered a NJ Courts Holiday
         CASE 
@@ -40,14 +44,15 @@ flagged AS (
                 WHERE holiday_date = transaction_date
             ) THEN TRUE
             ELSE FALSE
-        END AS is_holiday,
+        END AS flag_is_holiday,
 
         -- Checks if the provided vehicle_class_code is larger than allowed
         CASE vehicle_type_name
             WHEN 'Light Commercial' THEN TRUE
             WHEN 'Heavy Commercial' THEN TRUE
             ELSE FALSE
-        END as is_commercial_vehicle
+        END as flag_vehicle_type,
+        
 
     FROM base_features
 )
