@@ -47,7 +47,7 @@ flagged AS (
             WHEN 'Light Commercial' THEN TRUE
             WHEN 'Heavy Commercial' THEN TRUE
             ELSE FALSE
-        END as vehicle_type_class
+        END as is_commercial_vehicle
 
     FROM base_features
 )

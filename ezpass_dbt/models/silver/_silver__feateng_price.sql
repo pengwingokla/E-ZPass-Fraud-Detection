@@ -54,22 +54,22 @@ route_amount_base AS (
     SELECT
         pf.*,
         AVG(pf.amount) OVER (
-            PARTITION BY pf.plaza_route
+            PARTITION BY pf.route_name, pf.vehicle_type_code
         ) as route_amount_avg,
         STDDEV(pf.amount) OVER (
-            PARTITION BY pf.plaza_route
+            PARTITION BY pf.route_name, pf.vehicle_type_code
         ) as route_amount_std,
         MIN(pf.amount) OVER (
-            PARTITION BY pf.plaza_route
+            PARTITION BY pf.route_name, pf.vehicle_type_code
         ) as route_amount_min,
         MAX(pf.amount) OVER (
-            PARTITION BY pf.plaza_route
+            PARTITION BY pf.route_name, pf.vehicle_type_code
         ) as route_amount_max,
         PERCENTILE_CONT(amount, 0.5) OVER (
-            PARTITION BY pf.plaza_route
+            PARTITION BY pf.route_name, pf.vehicle_type_code
         ) as route_amount_med_raw,
         COUNT(*) OVER (
-            PARTITION BY pf.plaza_route
+            PARTITION BY pf.route_name, pf.vehicle_type_code
         ) as route_transaction_count
     FROM price_features pf
 ),

@@ -59,7 +59,7 @@ route_features AS (
             COALESCE(exit_plaza_previous, 'Unknown'), 
             ' to ', 
             exit_plaza
-        ) as plaza_route
+        ) as route_name
 
     FROM route_sequence
 ),
@@ -118,11 +118,11 @@ velocity_features AS (
             ELSE NULL
         END as speed_mph,
         
-        -- Minimum required travel time at reasonable speed (80 mph)
+        -- Minimum required travel time at reasonable speed (88 mph)
         CASE 
             WHEN distance_miles IS NOT NULL 
                  AND distance_miles > 0
-            THEN (distance_miles / 80.0) * 60  -- Convert hours to minutes
+            THEN (distance_miles / 88.0) * 60  -- Convert hours to minutes
             ELSE NULL
         END as min_required_travel_time_minutes,
         
@@ -136,11 +136,13 @@ velocity_features AS (
             WHEN TIMESTAMP_DIFF(exit_time, exit_time_previous, MINUTE) <= 0
             THEN TRUE
             -- Check if travel time is less than physically possible at 100 mph
-            WHEN TIMESTAMP_DIFF(exit_time, exit_time_previous, MINUTE) < 
-                (distance_miles / 100.0) * 60
+            WHEN distance_miles IS NOT NULL 
+                 AND distance_miles > 0
+                 AND TIMESTAMP_DIFF(exit_time, exit_time_previous, MINUTE) < (distance_miles / 90.0) * 60
             THEN TRUE
             -- Check if implied speed exceeds 100 mph
-            WHEN (distance_miles / TIMESTAMP_DIFF(exit_time, exit_time_previous, MINUTE)) * 60 > 100
+            WHEN TIMESTAMP_DIFF(exit_time, exit_time_previous, MINUTE) > 0
+                 AND (distance_miles / TIMESTAMP_DIFF(exit_time, exit_time_previous, MINUTE)) * 60 >= 100
             THEN TRUE
             ELSE FALSE
         END as is_impossible_travel,
@@ -163,8 +165,8 @@ velocity_features AS (
             WHEN entry_time IS NOT NULL 
                 AND exit_time_previous IS NOT NULL
             THEN FALSE -- FALSE if both times exist but there's no overlap
-            ELSE NULL -- NULL if either entry time or exit time previous is NULL
-        END as is_overlapping_journey,
+            ELSE FALSE -- FALSE/null? if either entry time or exit time previous is NULL
+        END as flag_overlapping_journey,
         
         -- Absolute overlap duration
         CASE 
@@ -172,14 +174,16 @@ velocity_features AS (
             THEN TIMESTAMP_DIFF(exit_time_previous, entry_time, MINUTE)
             ELSE 0
         END as overlapping_journey_duration_minutes,
-
-        -- Flag for possible tag cloning (overlap > 5 minutes)
-        CASE
-            WHEN entry_time < exit_time_previous
-                 AND TIMESTAMP_DIFF(exit_time_previous, entry_time, MINUTE) > 5
-            THEN TRUE
-            ELSE FALSE
-        END as flag_possible_cloning
+        
+        -- Categorize travel time
+        CASE 
+            WHEN TIMESTAMP_DIFF(exit_time, exit_time_previous, MINUTE) IS NULL THEN NULL
+            WHEN TIMESTAMP_DIFF(exit_time, exit_time_previous, MINUTE) < 0 THEN 'Invalid (Negative)'
+            WHEN TIMESTAMP_DIFF(exit_time, exit_time_previous, MINUTE) < 10 THEN 'Short (<10 min)'
+            WHEN TIMESTAMP_DIFF(exit_time, exit_time_previous, MINUTE) < 30 THEN 'Medium (10-30 min)'
+            WHEN TIMESTAMP_DIFF(exit_time, exit_time_previous, MINUTE) < 60 THEN 'Long (30-60 min)'
+            ELSE 'Very Long (60+ min)'
+        END as travel_time_category
 
     FROM distance_features
 )

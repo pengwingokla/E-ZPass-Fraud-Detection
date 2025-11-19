@@ -28,10 +28,10 @@ new_features AS (
         -- ============================================
 
         -- Extract datetime components
-        EXTRACT(DAYOFWEEK FROM transaction_date) as transaction_dayofweek,  -- 1=Sun, 7=Sat
-        EXTRACT(DAYOFYEAR FROM transaction_date) as transaction_dayofyear,
-        FORMAT_DATE('%B', transaction_date) as transaction_month,
-        FORMAT_DATE('%A', transaction_date) as transaction_day,
+        -- EXTRACT(DAYOFWEEK FROM transaction_date) as transaction_dayofweek,  -- 1=Sun, 7=Sat
+        -- EXTRACT(DAYOFYEAR FROM transaction_date) as transaction_dayofyear,
+        -- FORMAT_DATE('%B', transaction_date) as transaction_month,
+        -- FORMAT_DATE('%A', transaction_date) as transaction_day,
 
         -- Categorize days
         CASE 
@@ -62,6 +62,16 @@ new_features AS (
             ELSE 'Late Night'
         END as exit_time_of_day,
 
+        -- Flag for rush hour transactions
+        CASE 
+            WHEN (EXTRACT(HOUR FROM entry_time) BETWEEN 6 AND 8) 
+                 OR (EXTRACT(HOUR FROM entry_time) BETWEEN 15 AND 18)
+                 OR (EXTRACT(HOUR FROM exit_time) BETWEEN 6 AND 8) 
+                 OR (EXTRACT(HOUR FROM exit_time) BETWEEN 15 AND 18)
+            THEN TRUE
+            ELSE FALSE
+        END as flag_rush_hour,
+
         -- Combined journey category
         CONCAT(
             CASE 
@@ -88,22 +98,13 @@ new_features AS (
         -- Hour-by-hour patterns (0-23) 
         EXTRACT(HOUR FROM entry_time) as entry_hour,
         EXTRACT(HOUR FROM exit_time) as exit_hour,
-        
-        -- Duration categories
-        CASE 
-            WHEN TIMESTAMP_DIFF(exit_time, entry_time, MINUTE) IS NULL THEN ''
-            WHEN TIMESTAMP_DIFF(exit_time, entry_time, MINUTE) < 5 THEN 'Very Short (<5 min)'
-            WHEN TIMESTAMP_DIFF(exit_time, entry_time, MINUTE) < 15 THEN 'Short (5-15 min)'
-            WHEN TIMESTAMP_DIFF(exit_time, entry_time, MINUTE) < 30 THEN 'Medium (15-30 min)'
-            WHEN TIMESTAMP_DIFF(exit_time, entry_time, MINUTE) < 60 THEN 'Long (30-60 min)'
-            ELSE 'Very Long (60+ min)'
-        END as travel_duration_category,
 
         -- ============================================
         -- VEHICLE & USAGE FEATURES
         -- ============================================
         
         -- Vehicle class category
+        
         CASE 
             WHEN vehicle_type_code IN ('1', '2', '2L', '2H') THEN 'Passenger Vehicle'
             WHEN vehicle_type_code IN ('3', '3L', '3H', 'B2', 'B3') THEN 'Light Commercial'
@@ -117,4 +118,4 @@ new_features AS (
     FROM enriched
 )
 
-SELECT * FROM new_features
+SELECT * EXCEPT(entry_time_of_day, exit_time_of_day) FROM new_features

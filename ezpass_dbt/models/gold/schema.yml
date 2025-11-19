@@ -3,9 +3,14 @@ version: 2
 models:
   - name: gold
     description: >
-      Final fraud flag and threat severity is compiled here. Can also be used as input for a ML model if needed.
-      This is the final layer for fraud detection for automation.
+      Final fraud flag and threat severity are compiled here. Can also be used as input for an ML model if needed.
+      This is the final layer for fraud detection and automation.
     columns:
+      - name: transaction_id
+        description: Unique identifier for the transaction
+        tests:
+          - not_null
+
       - name: transaction_date
         description: Date when the transaction occurred
         tests:
@@ -13,13 +18,13 @@ models:
           
       - name: posting_date
         description: Date when the transaction was posted to the account
-        
+          
       - name: entry_time
         description: Timestamp when the vehicle entered the toll facility
-        
+          
       - name: exit_time
         description: Timestamp when the vehicle exited the toll facility
-        
+          
       - name: tag_plate_number
         description: E-ZPass tag or license plate number (uppercased and cleaned)
         tests:
@@ -31,15 +36,12 @@ models:
           - not_null
           - accepted_values:
               values: ['GSP', 'NJTP', 'SJ', 'PTC', 'DRJTBC', 'DRPA', 'PANYNJ', 'BCBC', 'NJ E-ZPASS', 'CBDTP', 'DELDOT', 'DRBA', 'ILTOLL', 'ITRCC', 'MASSDOT', 'MDTA', 'META', 'MTAB&T', 'NHDOT', 'NYSBA', 'NYSTA', 'OTIC', 'VDOT']
-              
+
       - name: agency_name
         description: Full agency name (e.g., Garden State Parkway)
 
       - name: state_name
         description: State name abbreviation (e.g., NJ, NY, PA, DE)
-        
-      - name: description
-        description: Transaction description
         
       - name: entry_plaza
         description: Entry plaza code
@@ -73,17 +75,181 @@ models:
         tests:
           - not_null
           
-      - name: prepaid
-        description: Indicates if transaction was prepaid
-        
       - name: balance
         description: Account balance after transaction
         
-      - name: loaded_at
+      - name: daily_count
+        description: Number of trips by this tag_plate_number on this transaction_date
+
+      - name: transaction_dayofweek
+        description: Day of the week for the transaction (0=Monday, 6=Sunday)
+
+      - name: transaction_dayofyear
+        description: Day of the year for the transaction
+
+      - name: transaction_month
+        description: Month of the transaction
+
+      - name: transaction_day
+        description: Day of the month for the transaction
+
+      - name: entry_time_of_day
+        description: Time of day (seconds past midnight) for entry_time
+
+      - name: exit_time_of_day
+        description: Time of day (seconds past midnight) for exit_time
+
+      - name: journey_time_of_day
+        description: Duration of journey in seconds
+
+      - name: entry_hour
+        description: Hour of the day for entry_time
+
+      - name: exit_hour
+        description: Hour of the day for exit_time
+
+      - name: travel_duration_category
+        description: Categorical label for travel duration (e.g., short, medium, long)
+
+      - name: vehicle_class_category
+        description: Categorical label for vehicle class
+
+      # - name: flag_is_weekend
+      #   description: True if transaction_date is a weekend
+
+      # - name: flag_is_out_of_state
+      #   description: True if transaction is outside NJ or a cross-border trip
+
+      # - name: flag_is_vehicle_type_gt2
+      #   description: True if vehicle class is Light/Heavy Commercial
+
+      # - name: flag_is_holiday
+      #   description: True if transaction_date is a holiday
+
+      # - name: is_missing_entry_plaza
+      #   description: True if entry_plaza is null
+
+      # - name: is_missing_exit_plaza
+      #   description: True if exit_plaza is null
+
+      # - name: is_missing_entry_time
+      #   description: True if entry_time is null
+
+      # - name: is_missing_exit_time
+      #   description: True if exit_time is null
+
+      - name: last_updated
         description: Timestamp when record was loaded into the data warehouse
         
       - name: source_file
         description: Name of the source file from which this record originated
+
+      # Behavioral baseline features
+      - name: driver_amount_30d_avg
+        description: Average transaction amount for this tag_plate_number over the last 30 days
+
+      - name: driver_amount_30d_std
+        description: Standard deviation of transaction amounts for this tag_plate_number over the last 30 days
+
+      - name: driver_amount_30d_median
+        description: Median transaction amount for this tag_plate_number over the last 30 days
+
+      - name: driver_amount_30d_max
+        description: Maximum transaction amount for this tag_plate_number over the last 30 days
+
+      - name: driver_amount_30d_min
+        description: Minimum transaction amount for this tag_plate_number over the last 30 days
+
+      - name: driver_txn_count_30d
+        description: Transaction count for this tag_plate_number over the last 30 days
+
+      - name: driver_avg_daily_txns_count
+        description: Average daily transactions over the last 30 days
+
+      - name: driver_active_days_30d
+        description: Number of days with activity for this tag_plate_number over the last 30 days
+
+      - name: driver_typical_entry_hour
+        description: Most common entry hour for this tag_plate_number
+
+      - name: driver_time_consistency
+        description: A measure of consistency for time-of-day entries
+
+      - name: driver_typical_route
+        description: Most common route used by this tag_plate_number
+
+      - name: driver_typical_agency
+        description: Most common agency used by this tag_plate_number
+
+      - name: driver_typical_dayofweek
+        description: Most common day of week for this tag_plate_number
+
+      # - name: driver_weekend_ratio
+      #   description: Share of weekend transactions over the last 30 days
+
+      - name: rolling_amount_15txn_avg
+        description: Average transaction amount over previous 15 transactions
+
+      - name: rolling_amount_15txn_std
+        description: Standard deviation of transaction amounts over previous 15 transactions
+
+      - name: rolling_amount_15txn_min
+        description: Minimum transaction amount over previous 15 transactions
+
+      - name: rolling_amount_15txn_max
+        description: Maximum transaction amount over previous 15 transactions
+
+      - name: rolling_txn_count_15txn
+        description: Transaction count over previous 15 transactions (including current)
+
+      - name: rolling_count_unique_exit_plazas_30txn
+        description: Number of distinct exit plazas over the last 30 transactions (including current)
+
+      - name: minutes_since_last_txn
+        description: Time since previous transaction for this tag_plate_number in minutes
+
+      - name: days_since_last_txn
+        description: Time since previous transaction for this tag_plate_number in days
+
+      - name: prev_exit_plaza
+        description: Exit plaza code of the previous transaction
+
+      - name: flag_rapid_succession
+        description: True if this and previous transaction occur in short succession
+
+      - name: flag_long_dormancy
+        description: True if a long gap occurs before this transaction
+
+      - name: flag_different_plaza_rapid
+        description: True if rapid transactions occur from different plazas
+
+      # Derived anomaly features
+      - name: amount_z_score
+        description: Z-score of the transaction amount compared to rolling baseline
+
+      - name: amount_ratio_to_median
+        description: Ratio of this transaction amount to 30d median
+
+      - name: flag_route_deviation
+        description: True if the route differs from driver typical route
+
+      - name: hours_from_typical
+        description: Difference in hours from driver's typical entry time
+
+      - name: flag_unusual_agency
+        description: True if driver is using a new agency
+
+      - name: flag_unusual_day
+        description: True if transaction day is not standard for driver
+
+      - name: flag_frequency_spike
+        description: True if 7d rolling txn count is much higher than baseline
+
+      - name: amount_volatility_ratio
+        description: Volatility ratio in rolling amount stats
+
+      - name: composite_anomaly_score
+        description: Score combining multiple anomaly flags and distance features
 
   - name: _gold__aggregation
     description: >

@@ -36,7 +36,7 @@ cleaned AS (
         NULLIF(TRIM(entry_lane), '-') as entry_lane,
         NULLIF(UPPER(TRIM(exit_plaza)), '-') as exit_plaza,
         NULLIF(TRIM(exit_lane), '-') as exit_lane,
-        NULLIF(TRIM(vehicle_type_code), '-') as vehicle_type_code,
+        COALESCE(NULLIF(TRIM(vehicle_type_code), '-'), '1') as vehicle_type_code,
         NULLIF(TRIM(plan_rate), '-') as plan_rate,
         NULLIF(TRIM(prepaid), '-') as prepaid,
         NULLIF(TRIM(fare_type), '-') as fare_type,
