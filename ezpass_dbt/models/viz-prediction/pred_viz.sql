@@ -1,5 +1,5 @@
 {{ config(
-    materialized='view',
+    materialized='table',
     tags=['predictions', 'visualization']
 ) }}
 

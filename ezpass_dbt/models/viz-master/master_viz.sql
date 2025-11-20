@@ -18,6 +18,15 @@ gold_data AS (
 
 SELECT 
     -- ===== CORE IDENTIFIERS =====
+
+    
+    -- Status column for workflow management
+    CASE 
+        WHEN LOWER(p.anomaly_category) IN ('high risk', 'critical risk') THEN 'Needs Review'
+        WHEN p.anomaly_category IS NULL THEN NULL
+        ELSE 'No Action Required'
+    END AS status,
+    
     g.transaction_id,
     g.transaction_date,
     g.posting_date,
@@ -28,6 +37,7 @@ SELECT
     g.anomaly_score AS rule_based_score,
     p.ml_anomaly_score AS ml_predicted_score,
     p.anomaly_category AS ml_predicted_category,
+    
     -- p.score_percentile_rank,
     -- p.score_p1_threshold,
     -- p.score_p5_threshold,

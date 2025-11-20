@@ -33,6 +33,9 @@ models:
       - name: anomaly_category
         description: "Risk category based on ML anomaly score percentiles: Critical Risk (<=p1), High Risk (<=p5), Medium Risk (<=p25), Low Risk (>p25)"
         
+      - name: status
+        description: "Workflow status for fraud review process. Automatically set to 'Needs Review' for High Risk or Critical Risk transactions, 'No Action Required' for lower risk levels"
+        
       - name: score_percentile_rank
         description: "Percentile rank of the ML anomaly score (0-1), where lower values indicate more anomalous transactions"
         
