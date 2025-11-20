@@ -39,9 +39,9 @@ SELECT
     -- ===== TIME & CONTEXT =====
     -- entry_hour,
     exit_hour,
-    travel_time_of_day,
-    flag_rush_hour,
-    flag_is_weekend,
+    -- travel_time_of_day,  -- Using encoded version instead
+    -- flag_rush_hour,  -- Excluded from training
+    -- flag_is_weekend,  -- Excluded from training
     
     -- ===== FINANCIAL =====
     amount,
@@ -62,7 +62,8 @@ SELECT
     entry_plaza_freq_encoded,
     exit_plaza_freq_encoded,
     vehicle_type_freq_encoded,
-    agency_freq_encoded
+    agency_freq_encoded,
+    travel_time_of_day_freq_encoded
 
 FROM {{ ref('_gold__encode') }}
 

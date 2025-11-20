@@ -52,6 +52,15 @@ agency_frequencies AS (
     GROUP BY agency
 ),
 
+-- Calculate frequency encoding for travel_time_of_day
+travel_time_of_day_frequencies AS (
+    SELECT
+        travel_time_of_day,
+        COUNT(*) as travel_time_of_day_frequency
+    FROM source
+    GROUP BY travel_time_of_day
+),
+
 encoded AS (
     SELECT
         s.*,
@@ -69,7 +78,10 @@ encoded AS (
         COALESCE(vf.vehicle_type_frequency, 0) as vehicle_type_freq_encoded,
         
         -- Agency encoding
-        COALESCE(af.agency_frequency, 0) as agency_freq_encoded
+        COALESCE(af.agency_frequency, 0) as agency_freq_encoded,
+        
+        -- Travel time of day encoding
+        COALESCE(ttdf.travel_time_of_day_frequency, 0) as travel_time_of_day_freq_encoded
         
     FROM source s
     LEFT JOIN route_frequencies rf
@@ -82,6 +94,8 @@ encoded AS (
         ON s.vehicle_type_code = vf.vehicle_type_code
     LEFT JOIN agency_frequencies af
         ON s.agency = af.agency
+    LEFT JOIN travel_time_of_day_frequencies ttdf
+        ON s.travel_time_of_day = ttdf.travel_time_of_day
 )
 
 SELECT * FROM encoded
