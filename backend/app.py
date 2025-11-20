@@ -18,7 +18,7 @@ CORS(app)
 def all_transactions():
     query = """
     SELECT * 
-    FROM `njc-ezpass.ezpass_data.gold`
+    FROM `njc-ezpass.ezpass_data.gold_automation`
     ORDER BY transaction_date DESC
     """
     results = client.query(query).result()
@@ -28,7 +28,13 @@ def all_transactions():
 #Get flagged or investigating transactions (Recent Alerts)
 @app.route("/api/transactions/alerts")
 def alerts():
-    query = f"SELECT * FROM `njc-ezpass.ezpass_data.gold` WHERE flag_fraud = TRUE OR threat_severity IS NOT NULL LIMIT 100"
+    query = """
+    SELECT * 
+    FROM `njc-ezpass.ezpass_data.gold_automation` 
+    WHERE flag_fraud = TRUE OR threat_severity IS NOT NULL 
+    ORDER BY transaction_date DESC
+    LIMIT 100
+    """
     results = client.query(query).result()
     rows = [dict(row) for row in results]
     return jsonify({"data": rows})
@@ -36,51 +42,69 @@ def alerts():
 #Aggregated metrics for dashboard cards
 @app.route("/api/metrics")
 def metrics():
-    query = f"""
+    query = """
     SELECT
         COUNT(*) AS total_transactions,
-        SUM(CASE WHEN flag_fraud THEN 1 ELSE 0 END) AS total_flagged,
-        SUM(amount) AS total_amount
-    FROM `njc-ezpass.ezpass_data.gold`
+        SUM(CASE WHEN flag_fraud = TRUE THEN 1 ELSE 0 END) AS total_flagged,
+        SUM(amount) AS total_amount,
+        SUM(CASE WHEN flag_fraud = TRUE AND EXTRACT(YEAR FROM transaction_date) = EXTRACT(YEAR FROM CURRENT_DATE()) THEN 1 ELSE 0 END) AS total_alerts_ytd,
+        SUM(CASE WHEN flag_fraud = TRUE AND EXTRACT(YEAR FROM transaction_date) = EXTRACT(YEAR FROM CURRENT_DATE()) 
+                 AND EXTRACT(MONTH FROM transaction_date) = EXTRACT(MONTH FROM CURRENT_DATE()) THEN 1 ELSE 0 END) AS detected_frauds_current_month
+    FROM `njc-ezpass.ezpass_data.gold_automation`
     """
-    results = client.query(query).result()
-    metrics = dict(next(results))
-    return jsonify(metrics)
+    try:
+        results = client.query(query).result()
+        metrics = dict(next(results))
+        return jsonify({
+            "total_transactions": int(metrics.get("total_transactions", 0)),
+            "total_flagged": int(metrics.get("total_flagged", 0)),
+            "total_amount": float(metrics.get("total_amount", 0)),
+            "total_alerts_ytd": int(metrics.get("total_alerts_ytd", 0)),
+            "detected_frauds_current_month": int(metrics.get("detected_frauds_current_month", 0))
+        })
+    except Exception as e:
+        print(f"Error fetching metrics: {str(e)}")
+        return jsonify({
+            "total_transactions": 0,
+            "total_flagged": 0,
+            "total_amount": 0,
+            "total_alerts_ytd": 0,
+            "detected_frauds_current_month": 0
+        }), 500
 
 #Fraud by Category for chart
 @app.route("/api/charts/category")
 def category_chart():
     query = """
+    WITH fraud_transactions AS (
+        SELECT 
+            triggered_flags
+        FROM `njc-ezpass.ezpass_data.gold_automation`
+        WHERE flag_fraud = TRUE AND triggered_flags IS NOT NULL AND triggered_flags != ''
+    ),
+    split_flags AS (
+        SELECT 
+            TRIM(REPLACE(REPLACE(REPLACE(REPLACE(flag, '"', ''), '[', ''), ']', ''), ' ', '')) AS category
+        FROM fraud_transactions,
+        UNNEST(SPLIT(triggered_flags, ',')) AS flag
+        WHERE TRIM(flag) != '' AND TRIM(flag) != 'null'
+    )
     SELECT 
-        'Holiday' AS category,
+        category,
         COUNT(*) AS count
-    FROM `njc-ezpass.ezpass_data.gold`
-    WHERE flag_fraud = TRUE AND flag_is_holiday = TRUE
-    UNION ALL
-    SELECT 
-        'Out of State' AS category,
-        COUNT(*) AS count
-    FROM `njc-ezpass.ezpass_data.gold`
-    WHERE flag_fraud = TRUE AND flag_is_out_of_state = TRUE
-    UNION ALL
-    SELECT 
-        'Vehicle Type > 2' AS category,
-        COUNT(*) AS count
-    FROM `njc-ezpass.ezpass_data.gold`
-    WHERE flag_fraud = TRUE AND flag_is_vehicle_type_gt2 = TRUE
-    UNION ALL
-    SELECT 
-        'Weekend' AS category,
-        COUNT(*) AS count
-    FROM `njc-ezpass.ezpass_data.gold`
-    WHERE flag_fraud = TRUE AND flag_is_weekend = TRUE
+    FROM split_flags
+    WHERE category IS NOT NULL AND category != ''
+    GROUP BY category
+    HAVING COUNT(*) > 0
     ORDER BY count DESC
     """
     try:
         results = client.query(query).result()
-        data = [{"category": row["category"], "count": int(row["count"])} for row in results]
-        # Filter out categories with 0 count
-        data = [item for item in data if item["count"] > 0]
+        data = []
+        for row in results:
+            category = str(row["category"]).strip() if row["category"] else None
+            if category and category.lower() not in ['null', 'none', '']:
+                data.append({"category": category, "count": int(row["count"])})
         return jsonify({"data": data})
     except Exception as e:
         print(f"Error fetching category chart data: {str(e)}")
@@ -89,9 +113,9 @@ def category_chart():
 #Threat Severity for chart
 @app.route("/api/charts/severity")
 def severity_chart():
-    query = f"""
+    query = """
     SELECT threat_severity, COUNT(*) AS count
-    FROM `njc-ezpass.ezpass_data.gold`
+    FROM `njc-ezpass.ezpass_data.gold_automation`
     WHERE threat_severity IS NOT NULL
     GROUP BY threat_severity
     """
@@ -110,7 +134,7 @@ def monthly_chart():
             EXTRACT(MONTH FROM DATE(transaction_date)) AS month_num,
             COUNT(*) AS total_transactions,
             SUM(CASE WHEN flag_fraud = TRUE THEN 1 ELSE 0 END) AS fraud_alerts
-        FROM `njc-ezpass.ezpass_data.gold`
+        FROM `njc-ezpass.ezpass_data.gold_automation`
         WHERE transaction_date IS NOT NULL
         GROUP BY year, month_num, month
         ORDER BY year DESC, month_num DESC

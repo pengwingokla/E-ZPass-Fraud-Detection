@@ -166,6 +166,36 @@ const fetchCategoryChartData = async () => {
     }
 };
 
+const fetchMetrics = async () => {
+    try {
+        const response = await fetch(`${apiUrl}/api/metrics`);
+        if (!response.ok) throw new Error('Failed to fetch metrics');
+        const data = await response.json();
+        return data;
+    } catch (err) {
+        console.error(err);
+        return {
+            total_transactions: 0,
+            total_flagged: 0,
+            total_amount: 0,
+            total_alerts_ytd: 0,
+            detected_frauds_current_month: 0
+        };
+    }
+};
+
+const fetchRecentAlerts = async () => {
+    try {
+        const response = await fetch(`${apiUrl}/api/transactions/alerts`);
+        if (!response.ok) throw new Error('Failed to fetch alerts');
+        const { data } = await response.json();
+        return data || [];
+    } catch (err) {
+        console.error(err);
+        return [];
+    }
+};
+
 
 /*
 const recentAlerts = [
@@ -421,9 +451,8 @@ const CategoryChart = () => {
     const getCategoryColor = (category, index) => {
         const colorMap = {
             'Holiday': 'rgba(239, 68, 68, 0.8)', // Red
-            'Out of State': 'rgba(14, 165, 233, 0.8)', // Blue
-            'Vehicle Type > 2': 'rgba(168, 85, 247, 0.8)', // Purple
-            'Weekend': 'rgba(236, 72, 153, 0.8)' // Pink
+            'Weekend': 'rgba(236, 72, 153, 0.8)', // Pink
+            'Possible Cloning': 'rgba(168, 85, 247, 0.8)' // Purple
         };
         return colorMap[category] || `rgba(${100 + index * 50}, ${150 + index * 30}, ${200 + index * 20}, 0.8)`;
     };
@@ -679,15 +708,37 @@ const RiskGauge = ({ score, label }) => {
 
 const DashboardView = ({ setActiveView }) => {
     const [animate, setAnimate] = useState(false);
+    const [metrics, setMetrics] = useState({
+        total_alerts_ytd: 0,
+        detected_frauds_current_month: 0,
+        total_amount: 0
+    });
+    const [recentFlaggedTransactions, setRecentFlaggedTransactions] = useState([]);
+    const [loading, setLoading] = useState(true);
     
     useEffect(() => {
         setAnimate(true);
+        const loadDashboardData = async () => {
+            setLoading(true);
+            try {
+                const [metricsData, alertsData] = await Promise.all([
+                    fetchMetrics(),
+                    fetchRecentAlerts()
+                ]);
+                setMetrics(metricsData);
+                // Get top 3 most recent flagged transactions
+                const recent = alertsData
+                    .filter(txn => txn.flag_fraud === true || txn.status === 'Flagged' || txn.status === 'Investigating')
+                    .slice(0, 3);
+                setRecentFlaggedTransactions(recent);
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadDashboardData();
     }, []);
-
-    // Get recent flagged transactions
-    const recentFlaggedTransactions = rawData
-        .filter(txn => txn.status === 'Flagged' || txn.status === 'Investigating')
-        .slice(0, 3);
 
     return (
         <div className="space-y-6">
@@ -701,7 +752,9 @@ const DashboardView = ({ setActiveView }) => {
                         </div>
                     </div>
                     <h3 className="text-gray-400 text-sm font-medium mb-1">Total Alerts (YTD)</h3>
-                    <p className="text-4xl font-bold text-white mb-2 bg-gradient-to-r from-teal-400 to-teal-200 bg-clip-text text-transparent">1,428</p>
+                    <p className="text-4xl font-bold text-white mb-2 bg-gradient-to-r from-teal-400 to-teal-200 bg-clip-text text-transparent">
+                        {loading ? '...' : metrics.total_alerts_ytd.toLocaleString()}
+                    </p>
                 </div>
 
                 {/* Potential Loss Card */}
@@ -712,7 +765,9 @@ const DashboardView = ({ setActiveView }) => {
                         </div>
                     </div>
                     <h3 className="text-gray-400 text-sm font-medium mb-1">Potential Loss (YTD)</h3>
-                    <p className="text-4xl font-bold text-white mb-2 bg-gradient-to-r from-rose-400 to-rose-200 bg-clip-text text-transparent">$76,330</p>
+                    <p className="text-4xl font-bold text-white mb-2 bg-gradient-to-r from-rose-400 to-rose-200 bg-clip-text text-transparent">
+                        {loading ? '...' : `$${Math.abs(metrics.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                    </p>
                 </div>
 
                 {/* Detected Frauds Card */}
@@ -723,7 +778,9 @@ const DashboardView = ({ setActiveView }) => {
                         </div>
                     </div>
                     <h3 className="text-gray-400 text-sm font-medium mb-1">Detected Frauds (Current Month)</h3>
-                    <p className="text-4xl font-bold text-white mb-2 bg-gradient-to-r from-amber-400 to-amber-200 bg-clip-text text-transparent">280</p>
+                    <p className="text-4xl font-bold text-white mb-2 bg-gradient-to-r from-amber-400 to-amber-200 bg-clip-text text-transparent">
+                        {loading ? '...' : metrics.detected_frauds_current_month.toLocaleString()}
+                    </p>
                 </div>
             </div>
 
@@ -751,37 +808,47 @@ const DashboardView = ({ setActiveView }) => {
                         <span className="px-2 py-1 bg-amber-500/20 text-amber-400 text-xs font-semibold rounded-full">{recentFlaggedTransactions.length} New</span>
                     </div>
                     <div className="space-y-4">
-                        {recentFlaggedTransactions.map((txn, idx) => (
-                            <div key={idx} className={`p-4 rounded-xl border transition-all duration-300 hover:scale-105 cursor-pointer ${
-                                txn.status === 'Investigating' 
-                                    ? 'bg-red-500/10 border-red-500/30 hover:border-red-500/50' 
-                                    : 'bg-amber-500/10 border-amber-500/30 hover:border-amber-500/50'
-                            }`}>
-                                <div className="flex items-start justify-between">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <span className="font-mono text-xs text-teal-400 font-semibold">{txn.id}</span>
-                                            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                                                txn.status === 'Investigating' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'
-                                            }`}>
-                                                {txn.status}
-                                            </span>
-                                        </div>
-                                        <p className="text-sm text-white font-medium mb-1">{txn.category}</p>
-                                        <div className="flex items-center gap-3 text-xs text-gray-400">
-                                            <span>{txn.tag_plate_number || txn.tagPlate || '-'}</span>
-                                            <span>•</span>
-                                            <span>${txn.amount.toFixed(2)}</span>
-                                            <span>•</span>
-                                            <span>{txn.agency}</span>
+                        {loading ? (
+                            <div className="text-gray-400 text-center py-4">Loading alerts...</div>
+                        ) : recentFlaggedTransactions.length === 0 ? (
+                            <div className="text-gray-400 text-center py-4">No recent flagged transactions</div>
+                        ) : (
+                            recentFlaggedTransactions.map((txn, idx) => {
+                                const status = txn.status || (txn.flag_fraud ? 'Flagged' : 'Resolved');
+                                const isInvestigating = status === 'Investigating';
+                                const category = txn.vehicle_type_name || txn.triggered_flags || 'Fraud Alert';
+                                
+                                return (
+                                    <div key={txn.transaction_id || idx} className={`p-4 rounded-xl border transition-all duration-300 hover:scale-105 cursor-pointer ${
+                                        isInvestigating 
+                                            ? 'bg-red-500/10 border-red-500/30 hover:border-red-500/50' 
+                                            : 'bg-amber-500/10 border-amber-500/30 hover:border-amber-500/50'
+                                    }`}>
+                                        <div className="flex items-start justify-between">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span className="font-mono text-xs text-teal-400 font-semibold">{txn.tag_plate_number || 'N/A'}</span>
+                                                    <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                                                        isInvestigating ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'
+                                                    }`}>
+                                                        {status}
+                                                    </span>
+                                                </div>
+                                                <p className="text-sm text-white font-medium mb-1">{category}</p>
+                                                <div className="flex items-center gap-3 text-xs text-gray-400">
+                                                    <span>${(txn.amount || 0).toFixed(2)}</span>
+                                                    <span>•</span>
+                                                    <span>{txn.agency || txn.agency_name || '-'}</span>
+                                                </div>
+                                            </div>
+                                            <div className={`w-2 h-2 rounded-full mt-1 ${
+                                                isInvestigating ? 'bg-red-500 animate-pulse' : 'bg-amber-500 animate-pulse'
+                                            }`}></div>
                                         </div>
                                     </div>
-                                    <div className={`w-2 h-2 rounded-full mt-1 ${
-                                        txn.status === 'Investigating' ? 'bg-red-500 animate-pulse' : 'bg-amber-500 animate-pulse'
-                                    }`}></div>
-                                </div>
-                            </div>
-                        ))}
+                                );
+                            })
+                        )}
                         <button 
                             onClick={() => setActiveView('data')}
                             className="w-full py-3 text-sm font-medium text-teal-400 hover:text-teal-300 transition-colors border border-slate-700 hover:border-teal-500/50 rounded-xl"
@@ -842,7 +909,7 @@ const DataView = () => {
     const handleStatusChange = (transactionId, newStatus) => {
         setTransactionData(prevData => 
             prevData.map(transaction => 
-                transaction.id === transactionId 
+                (transaction.transaction_id || transaction.id) === transactionId 
                     ? { ...transaction, status: newStatus }
                     : transaction
             )
@@ -910,13 +977,15 @@ const DataView = () => {
     };
 
     const filteredData = transactionData.filter(row => {
-        const id = row.id || '';
-        const category = row.category || '';
-        const tagPlate = row.tag_plate_number || row.tagPlate || '';
+        const id = row.transaction_id || row.id || '';
+        const category = row.vehicle_type_name || row.triggered_flags || row.category || '';
+        const tagPlate = row.tag_plate_number || '';
         const matchesSearch = id.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             category.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             tagPlate.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesFilter = filterStatus === 'all' || row.status === filterStatus;
+        // Derive status from flag_fraud if status field doesn't exist
+        const rowStatus = row.status || (row.flag_fraud ? 'Flagged' : 'Resolved');
+        const matchesFilter = filterStatus === 'all' || rowStatus === filterStatus;
         return matchesSearch && matchesFilter;
     });
 
@@ -1014,20 +1083,21 @@ const DataView = () => {
                         </thead>
                         <tbody className="divide-y divide-slate-700/50">
                             {paginatedData.map((row, index) => {
-                                const tagPlate = formatValue(row.tag_plate_number || row.tagPlate || row.tag_plate || row.plate_number);
+                                const tagPlate = formatValue(row.tag_plate_number);
                                 const transactionDate = formatDate(row.transaction_date);
-                                const agency = formatValue(row.agency);
-                                const entryTime = formatDateTime(row.entryTime || row.entry_time);
-                                const entryPlaza = formatValue(row.entryPlaza || row.entry_plaza);
-                                const exitTime = formatDateTime(row.exitTime || row.exit_time);
-                                const exitPlaza = formatValue(row.exitPlaza || row.exit_plaza);
+                                const agency = formatValue(row.agency || row.agency_name);
+                                const entryTime = formatDateTime(row.entry_time);
+                                const entryPlaza = formatValue(row.entry_plaza || row.entry_plaza_name);
+                                const exitTime = formatDateTime(row.exit_time);
+                                const exitPlaza = formatValue(row.exit_plaza || row.exit_plaza_name);
                                 const amount = row.amount !== null && row.amount !== undefined ? `$${parseFloat(row.amount).toFixed(2)}` : '-';
-                                const status = formatValue(row.status);
-                                const category = formatValue(row.category || row.vehicle_class_category);
+                                // Derive status from flag_fraud if status field doesn't exist
+                                const status = formatValue(row.status || (row.flag_fraud ? 'Flagged' : 'Resolved'));
+                                const category = formatValue(row.vehicle_type_name || row.triggered_flags || row.category);
 
                                 return (
                                     <tr 
-                                        key={row.id || index} 
+                                        key={row.transaction_id || row.id || index} 
                                         className="hover:bg-slate-700/30 transition-colors duration-150 group"
                                     >
                                         <td className="px-4 py-4 whitespace-nowrap">
@@ -1067,7 +1137,7 @@ const DataView = () => {
                                             {status !== '-' ? (
                                                 <select
                                                     value={status}
-                                                    onChange={(e) => handleStatusChange(row.id, e.target.value)}
+                                                    onChange={(e) => handleStatusChange(row.transaction_id || row.id, e.target.value)}
                                                     className={`px-2 py-1.5 rounded-lg text-xs font-semibold border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-0 ${
                                                         status === 'Investigating' ? 'bg-red-500/20 text-red-400 focus:ring-red-500/50' :
                                                         status === 'Flagged' ? 'bg-amber-500/20 text-amber-400 focus:ring-amber-500/50' :
