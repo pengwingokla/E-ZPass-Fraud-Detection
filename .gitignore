@@ -377,5 +377,10 @@ ezpass_dbt/target/
 ezpass_dbt/logs/
 ezpass_dbt/dbt_packages/
 
-# GCP key
+# GCP keys and service account credentials
 gcp-key.json
+*gcp-key*.json
+backend/config/gcp-key.json
+**/gcp-key.json
+*.json.key
+service-account*.json
