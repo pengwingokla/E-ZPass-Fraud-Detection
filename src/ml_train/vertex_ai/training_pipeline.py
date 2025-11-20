@@ -28,9 +28,9 @@ class FraudDetectionTrainer:
             *
         FROM 
             `{self.bq_table}`
-        LIMIT 1000000
-        """
         
+        """
+        # LIMIT 1000000
         
         print("Loading features from BigQuery...")
         df = client.query(query).to_dataframe()
