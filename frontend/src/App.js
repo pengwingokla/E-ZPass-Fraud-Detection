@@ -233,13 +233,13 @@ const TrendDownIcon = () => (
 */
 // --- Chart Components ---
 
-const defaultChartOptions = {
+const getChartOptions = (isDarkMode) => ({
     maintainAspectRatio: false,
     responsive: true,
     plugins: {
         legend: {
             labels: {
-                color: '#e5e7eb',
+                color: isDarkMode ? '#e5e7eb' : '#1e293b',
                 font: { family: "'Inter', sans-serif", size: 12, weight: '500' },
                 padding: 15,
                 usePointStyle: true,
@@ -247,10 +247,10 @@ const defaultChartOptions = {
             }
         },
         tooltip: {
-            backgroundColor: 'rgba(15, 23, 42, 0.95)',
-            titleColor: '#f1f5f9',
-            bodyColor: '#cbd5e1',
-            borderColor: '#334155',
+            backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+            titleColor: isDarkMode ? '#f1f5f9' : '#1e293b',
+            bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
+            borderColor: isDarkMode ? '#334155' : '#cbd5e1',
             borderWidth: 1,
             padding: 12,
             displayColors: true,
@@ -260,34 +260,45 @@ const defaultChartOptions = {
     scales: {
         x: {
             ticks: { 
-                color: '#94a3b8', 
+                color: isDarkMode ? '#94a3b8' : '#64748b', 
                 font: { family: "'Inter', sans-serif", size: 11 }
             },
             grid: { 
-                color: 'rgba(71, 85, 105, 0.2)',
+                color: isDarkMode ? 'rgba(71, 85, 105, 0.2)' : 'rgba(148, 163, 184, 0.2)',
                 drawBorder: false
             },
             border: { display: false }
         },
         y: {
             ticks: { 
-                color: '#94a3b8', 
+                color: isDarkMode ? '#94a3b8' : '#64748b', 
                 font: { family: "'Inter', sans-serif", size: 11 }
             },
             grid: { 
-                color: 'rgba(71, 85, 105, 0.2)',
+                color: isDarkMode ? 'rgba(71, 85, 105, 0.2)' : 'rgba(148, 163, 184, 0.2)',
                 drawBorder: false
             },
             border: { display: false }
         }
     }
-};
+});
 
 const BarChart = () => {
     const chartRef = useRef(null);
     const chartInstanceRef = useRef(null);
     const [chartData, setChartData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [isDarkMode, setIsDarkMode] = useState(document.documentElement.classList.contains('dark'));
+
+    useEffect(() => {
+        const checkTheme = () => {
+            setIsDarkMode(document.documentElement.classList.contains('dark'));
+        };
+        const observer = new MutationObserver(checkTheme);
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        checkTheme();
+        return () => observer.disconnect();
+    }, []);
 
     useEffect(() => {
         const loadChartData = async () => {
@@ -347,9 +358,8 @@ const BarChart = () => {
         const ctx = chartRef.current.getContext('2d');
         
         // Destroy existing chart if it exists
-        if (chartInstanceRef.current) {
-            chartInstanceRef.current.destroy();
-        }
+        Chart.getChart(chartRef.current)?.destroy();
+        chartInstanceRef.current = null;
         
         const gradient1 = ctx.createLinearGradient(0, 0, 0, 400);
         gradient1.addColorStop(0, 'rgba(20, 184, 166, 0.8)');
@@ -393,7 +403,7 @@ const BarChart = () => {
                 datasets: datasets
             },
             options: {
-                ...defaultChartOptions,
+                ...getChartOptions(isDarkMode),
                 interaction: {
                     mode: 'index',
                     intersect: false
@@ -409,12 +419,12 @@ const BarChart = () => {
                 chartInstanceRef.current = null;
             }
         };
-    }, [chartData, loading]);
+    }, [chartData, loading, isDarkMode]);
 
     if (loading) {
         return (
             <div className="h-80 flex items-center justify-center">
-                <div className="text-gray-400">Loading chart data...</div>
+                <div className="text-gray-400 dark:text-gray-400 text-gray-600">Loading chart data...</div>
             </div>
         );
     }
@@ -422,7 +432,7 @@ const BarChart = () => {
     if (!chartData || !chartData.labels || chartData.labels.length === 0) {
         return (
             <div className="h-80 flex items-center justify-center">
-                <div className="text-gray-400">No chart data available</div>
+                <div className="text-gray-400 dark:text-gray-400 text-gray-600">No chart data available</div>
             </div>
         );
     }
@@ -435,16 +445,50 @@ const CategoryChart = () => {
     const chartInstanceRef = useRef(null);
     const [chartData, setChartData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [isDarkMode, setIsDarkMode] = useState(document.documentElement.classList.contains('dark'));
 
-    // Color mapping for different fraud categories
+    useEffect(() => {
+        const checkTheme = () => {
+            setIsDarkMode(document.documentElement.classList.contains('dark'));
+        };
+        const observer = new MutationObserver(checkTheme);
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        checkTheme();
+        return () => observer.disconnect();
+    }, []);
+
+    // Color mapping for different fraud categories - using vibrant colors visible in light mode
     const getCategoryColor = (category, index) => {
         const colorMap = {
-            'Holiday': 'rgba(239, 68, 68, 0.8)', // Red
-            'Out of State': 'rgba(14, 165, 233, 0.8)', // Blue
-            'Vehicle Type > 2': 'rgba(168, 85, 247, 0.8)', // Purple
-            'Weekend': 'rgba(236, 72, 153, 0.8)' // Pink
+            'Holiday': 'rgba(239, 68, 68, 0.9)', // Red
+            'Out of State': 'rgba(14, 165, 233, 0.9)', // Sky Blue
+            'Vehicle Type > 2': 'rgba(168, 85, 247, 0.9)', // Purple
+            'Weekend': 'rgba(236, 72, 153, 0.9)', // Pink
+            'Driver Amount Outlier': 'rgba(59, 130, 246, 0.9)', // Blue
+            'Rush Hour': 'rgba(34, 197, 94, 0.9)', // Green
+            'Amount Unusually High': 'rgba(251, 146, 60, 0.9)', // Orange
+            'Route Amount Outlier': 'rgba(139, 92, 246, 0.9)', // Violet
+            'Driver Spend Spike': 'rgba(20, 184, 166, 0.9)', // Teal
+            'Overlapping Journey': 'rgba(245, 158, 11, 0.9)', // Amber
+            'Possible Cloning': 'rgba(168, 85, 247, 0.9)', // Purple
+            'Toll Evasion': 'rgba(239, 68, 68, 0.9)', // Red
+            'Account Takeover': 'rgba(220, 38, 38, 0.9)', // Dark Red
+            'Card Skimming': 'rgba(236, 72, 153, 0.9)' // Pink
         };
-        return colorMap[category] || `rgba(${100 + index * 50}, ${150 + index * 30}, ${200 + index * 20}, 0.8)`;
+        // Fallback colors - using vibrant, distinct colors that are visible in light mode
+        const fallbackColors = [
+            'rgba(59, 130, 246, 0.9)',   // Blue
+            'rgba(34, 197, 94, 0.9)',   // Green
+            'rgba(251, 146, 60, 0.9)',  // Orange
+            'rgba(139, 92, 246, 0.9)',  // Violet
+            'rgba(20, 184, 166, 0.9)',  // Teal
+            'rgba(245, 158, 11, 0.9)',  // Amber
+            'rgba(239, 68, 68, 0.9)',   // Red
+            'rgba(236, 72, 153, 0.9)',  // Pink
+            'rgba(168, 85, 247, 0.9)',  // Purple
+            'rgba(14, 165, 233, 0.9)'   // Sky Blue
+        ];
+        return colorMap[category] || fallbackColors[index % fallbackColors.length];
     };
 
     useEffect(() => {
@@ -488,9 +532,8 @@ const CategoryChart = () => {
         if (!chartRef.current || !chartData || loading) return;
 
         // Destroy existing chart if it exists
-        if (chartInstanceRef.current) {
-            chartInstanceRef.current.destroy();
-        }
+        Chart.getChart(chartRef.current)?.destroy();
+        chartInstanceRef.current = null;
 
         // Don't render chart if no data
         if (chartData.labels.length === 0) {
@@ -505,22 +548,22 @@ const CategoryChart = () => {
                     label: ' Incidents',
                     data: chartData.counts,
                     backgroundColor: chartData.colors,
-                    borderColor: 'rgba(15, 23, 42, 0.8)',
+                    borderColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(229, 231, 235, 0.9)',
                     borderWidth: 3,
                     hoverOffset: 20,
-                    hoverBorderColor: '#fff',
+                    hoverBorderColor: isDarkMode ? '#fff' : '#374151',
                     hoverBorderWidth: 3
                 }]
             },
             options: {
-                ...defaultChartOptions,
+                ...getChartOptions(isDarkMode),
                 cutout: '65%',
                 scales: { x: { display: false }, y: { display: false } },
                 plugins: {
                     legend: {
                         position: 'bottom',
                         labels: { 
-                            color: '#e5e7eb', 
+                            color: isDarkMode ? '#e5e7eb' : '#1e293b', 
                             font: { family: "'Inter', sans-serif", size: 12, weight: '500' },
                             padding: 20,
                             usePointStyle: true,
@@ -528,10 +571,10 @@ const CategoryChart = () => {
                         }
                     },
                     tooltip: {
-                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                        titleColor: '#f1f5f9',
-                        bodyColor: '#cbd5e1',
-                        borderColor: '#334155',
+                        backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+                        titleColor: isDarkMode ? '#f1f5f9' : '#1e293b',
+                        bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
+                        borderColor: isDarkMode ? '#334155' : '#cbd5e1',
                         borderWidth: 1,
                         padding: 12,
                         callbacks: {
@@ -556,12 +599,12 @@ const CategoryChart = () => {
                 chartInstanceRef.current = null;
             }
         };
-    }, [chartData, loading]);
+    }, [chartData, loading, isDarkMode]);
 
     if (loading) {
         return (
             <div className="h-80 w-full flex justify-center items-center">
-                <div className="text-gray-400">Loading chart data...</div>
+                <div className="text-gray-400 dark:text-gray-400 text-gray-600">Loading chart data...</div>
             </div>
         );
     }
@@ -569,7 +612,7 @@ const CategoryChart = () => {
     if (!chartData || chartData.labels.length === 0) {
         return (
             <div className="h-80 w-full flex justify-center items-center">
-                <div className="text-gray-400">No fraud data available</div>
+                <div className="text-gray-400 dark:text-gray-400 text-gray-600">No fraud data available</div>
             </div>
         );
     }
@@ -579,7 +622,23 @@ const CategoryChart = () => {
 
 const SeverityChart = () => {
     const chartRef = useRef(null);
+    const [isDarkMode, setIsDarkMode] = useState(document.documentElement.classList.contains('dark'));
+
     useEffect(() => {
+        const checkTheme = () => {
+            setIsDarkMode(document.documentElement.classList.contains('dark'));
+        };
+        const observer = new MutationObserver(checkTheme);
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        checkTheme();
+        return () => observer.disconnect();
+    }, []);
+
+    useEffect(() => {
+        if (!chartRef.current) return;
+
+        Chart.getChart(chartRef.current)?.destroy();
+
         const chart = new Chart(chartRef.current, {
             type: 'doughnut',
             data: {
@@ -592,22 +651,22 @@ const SeverityChart = () => {
                         'rgba(251, 146, 60, 0.8)',
                         'rgba(34, 197, 94, 0.8)'
                     ],
-                    borderColor: 'rgba(15, 23, 42, 0.8)',
+                    borderColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)',
                     borderWidth: 3,
                     hoverOffset: 20,
-                    hoverBorderColor: '#fff',
+                    hoverBorderColor: isDarkMode ? '#fff' : '#1e293b',
                     hoverBorderWidth: 3
                 }]
             },
             options: {
-                ...defaultChartOptions,
+                ...getChartOptions(isDarkMode),
                 cutout: '65%',
                 scales: { x: { display: false }, y: { display: false } },
                 plugins: {
                     legend: {
                         position: 'bottom',
                         labels: { 
-                            color: '#e5e7eb', 
+                            color: isDarkMode ? '#e5e7eb' : '#1e293b', 
                             font: { family: "'Inter', sans-serif", size: 12, weight: '500' },
                             padding: 20,
                             usePointStyle: true,
@@ -615,10 +674,10 @@ const SeverityChart = () => {
                         }
                     },
                     tooltip: {
-                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                        titleColor: '#f1f5f9',
-                        bodyColor: '#cbd5e1',
-                        borderColor: '#334155',
+                        backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+                        titleColor: isDarkMode ? '#f1f5f9' : '#1e293b',
+                        bodyColor: isDarkMode ? '#cbd5e1' : '#475569',
+                        borderColor: isDarkMode ? '#334155' : '#cbd5e1',
                         borderWidth: 1,
                         padding: 12,
                         callbacks: {
@@ -635,7 +694,7 @@ const SeverityChart = () => {
             }
         });
         return () => chart.destroy();
-    }, []);
+    }, [isDarkMode]);
     return <div className="h-80 w-full flex justify-center items-center"><canvas ref={chartRef}></canvas></div>;
 };
 
@@ -713,61 +772,61 @@ const DashboardView = ({ setActiveView }) => {
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Total Alerts Card */}
-                <div className={`group bg-gradient-to-br from-slate-800/80 to-slate-800/40 backdrop-blur-sm border border-slate-700/50 p-6 rounded-2xl shadow-xl hover:shadow-2xl hover:border-teal-500/50 transition-all duration-300 transform hover:-translate-y-1 ${animate ? 'animate-fadeIn' : 'opacity-0'}`}>
+                <div className={`group bg-white dark:bg-gradient-to-br dark:from-slate-800/80 dark:to-slate-800/40 backdrop-blur-sm border border-gray-200 dark:border-slate-700/50 p-6 rounded-2xl shadow-xl hover:shadow-2xl hover:border-teal-500/50 transition-all duration-300 transform hover:-translate-y-1 ${animate ? 'animate-fadeIn' : 'opacity-0'}`}>
                     <div className="flex items-center mb-4">
                         <div className="p-3 bg-gradient-to-br from-teal-500/20 to-teal-600/10 rounded-xl ring-2 ring-teal-500/20 group-hover:ring-teal-500/40 transition-all">
                             <ShieldIcon />
                         </div>
                     </div>
-                    <h3 className="text-gray-400 text-sm font-medium mb-1">Total Alerts (YTD)</h3>
-                    <p className="text-4xl font-bold text-white mb-2 bg-gradient-to-r from-teal-400 to-teal-200 bg-clip-text text-transparent">1,428</p>
+                    <h3 className="text-gray-400 dark:text-gray-400 text-gray-600 text-sm font-medium mb-1">Total Alerts (YTD)</h3>
+                    <p className="text-4xl font-bold dark:text-white text-gray-900 mb-2 bg-gradient-to-r from-teal-400 to-teal-200 dark:from-teal-400 dark:to-teal-200 from-teal-600 to-teal-700 bg-clip-text text-transparent">1,428</p>
                 </div>
 
                 {/* Potential Loss Card */}
-                <div className={`group bg-gradient-to-br from-slate-800/80 to-slate-800/40 backdrop-blur-sm border border-slate-700/50 p-6 rounded-2xl shadow-xl hover:shadow-2xl hover:border-rose-500/50 transition-all duration-300 transform hover:-translate-y-1 ${animate ? 'animate-fadeIn' : 'opacity-0'}`} style={{animationDelay: '0.1s'}}>
+                <div className={`group bg-white dark:bg-gradient-to-br dark:from-slate-800/80 dark:to-slate-800/40 backdrop-blur-sm border border-gray-200 dark:border-slate-700/50 p-6 rounded-2xl shadow-xl hover:shadow-2xl hover:border-rose-500/50 transition-all duration-300 transform hover:-translate-y-1 ${animate ? 'animate-fadeIn' : 'opacity-0'}`} style={{animationDelay: '0.1s'}}>
                     <div className="flex items-center mb-4">
                         <div className="p-3 bg-gradient-to-br from-rose-500/20 to-rose-600/10 rounded-xl ring-2 ring-rose-500/20 group-hover:ring-rose-500/40 transition-all">
                             <DollarIcon />
                         </div>
                     </div>
-                    <h3 className="text-gray-400 text-sm font-medium mb-1">Potential Loss (YTD)</h3>
-                    <p className="text-4xl font-bold text-white mb-2 bg-gradient-to-r from-rose-400 to-rose-200 bg-clip-text text-transparent">$76,330</p>
+                    <h3 className="text-gray-400 dark:text-gray-400 text-gray-600 text-sm font-medium mb-1">Potential Loss (YTD)</h3>
+                    <p className="text-4xl font-bold dark:text-white text-gray-900 mb-2 bg-gradient-to-r from-rose-400 to-rose-200 dark:from-rose-400 dark:to-rose-200 from-rose-600 to-rose-700 bg-clip-text text-transparent">$76,330</p>
                 </div>
 
                 {/* Detected Frauds Card */}
-                <div className={`group bg-gradient-to-br from-slate-800/80 to-slate-800/40 backdrop-blur-sm border border-slate-700/50 p-6 rounded-2xl shadow-xl hover:shadow-2xl hover:border-amber-500/50 transition-all duration-300 transform hover:-translate-y-1 ${animate ? 'animate-fadeIn' : 'opacity-0'}`} style={{animationDelay: '0.2s'}}>
+                <div className={`group bg-white dark:bg-gradient-to-br dark:from-slate-800/80 dark:to-slate-800/40 backdrop-blur-sm border border-gray-200 dark:border-slate-700/50 p-6 rounded-2xl shadow-xl hover:shadow-2xl hover:border-amber-500/50 transition-all duration-300 transform hover:-translate-y-1 ${animate ? 'animate-fadeIn' : 'opacity-0'}`} style={{animationDelay: '0.2s'}}>
                     <div className="flex items-center mb-4">
                         <div className="p-3 bg-gradient-to-br from-amber-500/20 to-amber-600/10 rounded-xl ring-2 ring-amber-500/20 group-hover:ring-amber-500/40 transition-all">
                             <AlertIcon />
                         </div>
                     </div>
-                    <h3 className="text-gray-400 text-sm font-medium mb-1">Detected Frauds (Current Month)</h3>
-                    <p className="text-4xl font-bold text-white mb-2 bg-gradient-to-r from-amber-400 to-amber-200 bg-clip-text text-transparent">280</p>
+                    <h3 className="text-gray-400 dark:text-gray-400 text-gray-600 text-sm font-medium mb-1">Detected Frauds (Current Month)</h3>
+                    <p className="text-4xl font-bold dark:text-white text-gray-900 mb-2 bg-gradient-to-r from-amber-400 to-amber-200 dark:from-amber-400 dark:to-amber-200 from-amber-600 to-amber-700 bg-clip-text text-transparent">280</p>
                 </div>
             </div>
 
             {/* Charts Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Bar Chart */}
-                <div className="lg:col-span-2 bg-gradient-to-br from-slate-800/80 to-slate-800/40 backdrop-blur-sm border border-slate-700/50 p-6 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300">
+                <div className="lg:col-span-2 bg-white dark:bg-gradient-to-br dark:from-slate-800/80 dark:to-slate-800/40 backdrop-blur-sm border border-gray-200 dark:border-slate-700/50 p-6 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300">
                     <div className="flex items-center justify-between mb-6">
                         <div>
-                            <h3 className="font-bold text-xl text-white mb-1">Transaction Analysis</h3>
-                            <p className="text-sm text-gray-400">Month-over-month comparison</p>
+                            <h3 className="font-bold text-xl dark:text-white text-gray-900 mb-1">Transaction Analysis</h3>
+                            <p className="text-sm text-gray-400 dark:text-gray-400 text-gray-600">Month-over-month comparison</p>
                         </div>
                         <div className="flex space-x-2">
-                            <button className="px-3 py-1 text-xs font-medium bg-teal-500/20 text-teal-400 rounded-lg hover:bg-teal-500/30 transition-colors">6M</button>
-                            <button className="px-3 py-1 text-xs font-medium bg-slate-700/50 text-gray-400 rounded-lg hover:bg-slate-700 transition-colors">1Y</button>
+                            <button className="px-3 py-1 text-xs font-medium bg-teal-500/20 text-teal-400 dark:text-teal-400 text-teal-600 rounded-lg hover:bg-teal-500/30 transition-colors">6M</button>
+                            <button className="px-3 py-1 text-xs font-medium bg-slate-700/50 dark:bg-slate-700/50 bg-gray-200 text-gray-400 dark:text-gray-400 text-gray-600 rounded-lg hover:bg-slate-700 dark:hover:bg-slate-700 hover:bg-gray-300 transition-colors">1Y</button>
                         </div>
                     </div>
                     <BarChart />
                 </div>
 
                 {/* Alert Feed */}
-                <div className="bg-gradient-to-br from-slate-800/80 to-slate-800/40 backdrop-blur-sm border border-slate-700/50 p-6 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300">
+                <div className="bg-white dark:bg-gradient-to-br dark:from-slate-800/80 dark:to-slate-800/40 backdrop-blur-sm border border-gray-200 dark:border-slate-700/50 p-6 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300">
                     <div className="flex items-center justify-between mb-6">
-                        <h3 className="font-bold text-xl text-white">Recent Flagged Transactions</h3>
-                        <span className="px-2 py-1 bg-amber-500/20 text-amber-400 text-xs font-semibold rounded-full">{recentFlaggedTransactions.length} New</span>
+                        <h3 className="font-bold text-xl dark:text-white text-gray-900">Recent Flagged Transactions</h3>
+                        <span className="px-2 py-1 bg-amber-500/20 text-amber-400 dark:text-amber-400 text-amber-600 text-xs font-semibold rounded-full">{recentFlaggedTransactions.length} New</span>
                     </div>
                     <div className="space-y-4">
                         {recentFlaggedTransactions.map((txn, idx) => (
@@ -779,15 +838,15 @@ const DashboardView = ({ setActiveView }) => {
                                 <div className="flex items-start justify-between">
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2 mb-2">
-                                            <span className="font-mono text-xs text-teal-400 font-semibold">{txn.id}</span>
+                                            <span className="font-mono text-xs text-teal-400 dark:text-teal-400 text-teal-600 font-semibold">{txn.id}</span>
                                             <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                                                txn.status === 'Investigating' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'
+                                                txn.status === 'Investigating' ? 'bg-red-500/20 text-red-400 dark:text-red-400 text-red-600' : 'bg-amber-500/20 text-amber-400 dark:text-amber-400 text-amber-600'
                                             }`}>
                                                 {txn.status}
                                             </span>
                                         </div>
-                                        <p className="text-sm text-white font-medium mb-1">{txn.category}</p>
-                                        <div className="flex items-center gap-3 text-xs text-gray-400">
+                                                <p className="text-sm dark:text-white text-gray-900 font-medium mb-1">{txn.category}</p>
+                                        <div className="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-400 text-gray-600">
                                             <span>{txn.tag_plate_number || txn.tagPlate || '-'}</span>
                                             <span>•</span>
                                             <span>${txn.amount.toFixed(2)}</span>
@@ -803,7 +862,7 @@ const DashboardView = ({ setActiveView }) => {
                         ))}
                         <button 
                             onClick={() => setActiveView('data')}
-                            className="w-full py-3 text-sm font-medium text-teal-400 hover:text-teal-300 transition-colors border border-slate-700 hover:border-teal-500/50 rounded-xl"
+                            className="w-full py-3 text-sm font-medium text-teal-400 dark:text-teal-400 text-teal-600 hover:text-teal-300 dark:hover:text-teal-300 hover:text-teal-700 transition-colors border border-slate-700 dark:border-slate-700 border-gray-300 hover:border-teal-500/50 dark:hover:border-teal-500/50 hover:border-teal-600 rounded-xl"
                         >
                             View All Alerts →
                         </button>
@@ -814,19 +873,19 @@ const DashboardView = ({ setActiveView }) => {
             {/* Bottom Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Category Chart */}
-                <div className="bg-gradient-to-br from-slate-800/80 to-slate-800/40 backdrop-blur-sm border border-slate-700/50 p-6 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300">
+                <div className="bg-white dark:bg-gradient-to-br dark:from-slate-800/80 dark:to-slate-800/40 backdrop-blur-sm border border-gray-200 dark:border-slate-700/50 p-6 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300">
                     <div className="mb-6">
-                        <h3 className="font-bold text-xl text-white mb-1">Fraud by Category</h3>
-                        <p className="text-sm text-gray-400">Distribution across incident types</p>
+                        <h3 className="font-bold text-xl dark:text-white text-gray-900 mb-1">Fraud by Category</h3>
+                        <p className="text-sm text-gray-400 dark:text-gray-400 text-gray-600">Distribution across incident types</p>
                     </div>
                     <CategoryChart />
                 </div>
 
                 {/* Severity Chart */}
-                <div className="bg-gradient-to-br from-slate-800/80 to-slate-800/40 backdrop-blur-sm border border-slate-700/50 p-6 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300">
+                <div className="bg-white dark:bg-gradient-to-br dark:from-slate-800/80 dark:to-slate-800/40 backdrop-blur-sm border border-gray-200 dark:border-slate-700/50 p-6 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300">
                     <div className="mb-6">
-                        <h3 className="font-bold text-xl text-white mb-1">Threat Severity</h3>
-                        <p className="text-sm text-gray-400">Risk level distribution</p>
+                        <h3 className="font-bold text-xl dark:text-white text-gray-900 mb-1">Threat Severity</h3>
+                        <p className="text-sm text-gray-400 dark:text-gray-400 text-gray-600">Risk level distribution</p>
                     </div>
                     <SeverityChart />
                 </div>
@@ -838,6 +897,17 @@ const DashboardView = ({ setActiveView }) => {
 const ScatterPlot = () => {
     const [chartData, setChartData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [isDarkMode, setIsDarkMode] = useState(document.documentElement.classList.contains('dark'));
+
+    useEffect(() => {
+        const checkTheme = () => {
+            setIsDarkMode(document.documentElement.classList.contains('dark'));
+        };
+        const observer = new MutationObserver(checkTheme);
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        checkTheme();
+        return () => observer.disconnect();
+    }, []);
 
     useEffect(() => {
         const fetchScatterData = async () => {
@@ -857,11 +927,11 @@ const ScatterPlot = () => {
     }, []);
 
     if (loading) {
-        return <div className="text-gray-400">Loading scatter plot data...</div>;
+        return <div className="text-gray-400 dark:text-gray-400 text-gray-600">Loading scatter plot data...</div>;
     }
 
     if (!chartData || chartData.length === 0) {
-        return <div className="text-gray-400">No data available for scatter plot</div>;
+        return <div className="text-gray-400 dark:text-gray-400 text-gray-600">No data available for scatter plot</div>;
     }
 
     // Group data by risk level
@@ -896,36 +966,36 @@ const ScatterPlot = () => {
     const layout = {
         title: {
             text: 'ML Anomaly Score vs Amount',
-            font: { color: '#e5e7eb', size: 20 }
+            font: { color: isDarkMode ? '#e5e7eb' : '#1e293b', size: 20 }
         },
         xaxis: {
             title: {
                 text: 'Amount',
-                font: { color: '#94a3b8' }
+                font: { color: isDarkMode ? '#94a3b8' : '#64748b' }
             },
             range: [0, 500],
-            gridcolor: 'rgba(71, 85, 105, 0.2)',
-            color: '#94a3b8'
+            gridcolor: isDarkMode ? 'rgba(71, 85, 105, 0.2)' : 'rgba(148, 163, 184, 0.2)',
+            color: isDarkMode ? '#94a3b8' : '#64748b'
         },
         yaxis: {
             title: {
                 text: 'ml_anomaly_score',
-                font: { color: '#94a3b8' }
+                font: { color: isDarkMode ? '#94a3b8' : '#64748b' }
             },
             range: [-0.1, 0.5],
-            gridcolor: 'rgba(71, 85, 105, 0.2)',
-            color: '#94a3b8'
+            gridcolor: isDarkMode ? 'rgba(71, 85, 105, 0.2)' : 'rgba(148, 163, 184, 0.2)',
+            color: isDarkMode ? '#94a3b8' : '#64748b'
         },
-        plot_bgcolor: 'rgba(15, 23, 42, 0.5)',
+        plot_bgcolor: isDarkMode ? 'rgba(15, 23, 42, 0.5)' : 'rgba(255, 255, 255, 0.5)',
         paper_bgcolor: 'transparent',
-        font: { color: '#94a3b8' },
+        font: { color: isDarkMode ? '#94a3b8' : '#64748b' },
         legend: {
             x: 1.02,
             y: 1,
-            bgcolor: 'rgba(15, 23, 42, 0.8)',
-            bordercolor: 'rgba(71, 85, 105, 0.5)',
+            bgcolor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+            bordercolor: isDarkMode ? 'rgba(71, 85, 105, 0.5)' : 'rgba(148, 163, 184, 0.5)',
             borderwidth: 1,
-            font: { color: '#e5e7eb' }
+            font: { color: isDarkMode ? '#e5e7eb' : '#1e293b' }
         },
         margin: { l: 60, r: 150, t: 60, b: 60 }
     };
@@ -940,6 +1010,7 @@ const ScatterPlot = () => {
     return (
         <div style={{ height: '600px' }}>
             <Plot
+                key={isDarkMode ? 'dark' : 'light'}
                 data={traces}
                 layout={layout}
                 config={config}
@@ -952,7 +1023,7 @@ const ScatterPlot = () => {
 const ChartsView = () => {
     return (
         <div className="space-y-6">
-            <div className="bg-gradient-to-br from-slate-800/80 to-slate-800/40 backdrop-blur-sm border border-slate-700/50 p-6 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300">
+            <div className="bg-white dark:bg-gradient-to-br dark:from-slate-800/80 dark:to-slate-800/40 backdrop-blur-sm border border-gray-200 dark:border-slate-700/50 p-6 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300">
                 <ScatterPlot />
             </div>
         </div>
@@ -1010,7 +1081,7 @@ const DataView = () => {
     const SortableHeader = ({ column, label, minWidthClass = 'min-w-[120px]' }) => (
         <th 
             scope="col" 
-            className={`px-4 py-4 text-left text-sm font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap ${minWidthClass} cursor-pointer hover:bg-slate-800/50 transition-colors`}
+            className={`px-4 py-4 text-left text-sm font-semibold text-gray-400 dark:text-gray-400 text-gray-600 uppercase tracking-wider whitespace-nowrap ${minWidthClass} cursor-pointer hover:bg-slate-800/50 dark:hover:bg-slate-800/50 hover:bg-gray-100 transition-colors`}
             onClick={() => handleSort(column)}
         >
             <div className="flex items-center gap-2">
@@ -1022,7 +1093,7 @@ const DataView = () => {
                         <SortDownIcon />
                     )
                 ) : (
-                    <span className="text-gray-600"><SortIcon /></span>
+                    <span className="text-gray-600 dark:text-gray-600 text-gray-400"><SortIcon /></span>
                 )}
             </div>
         </th>
@@ -1167,7 +1238,7 @@ const DataView = () => {
     return (
         <div className="space-y-6">
             {/* Search and Filter Bar */}
-            <div className="bg-gradient-to-br from-slate-800/80 to-slate-800/40 backdrop-blur-sm border border-slate-700/50 p-6 rounded-2xl shadow-xl">
+            <div className="bg-white dark:bg-gradient-to-br dark:from-slate-800/80 dark:to-slate-800/40 backdrop-blur-sm border border-gray-200 dark:border-slate-700/50 p-6 rounded-2xl shadow-xl">
                 <div className="flex flex-col md:flex-row gap-4">
                     <div className="flex-1 relative">
                         <input
@@ -1175,9 +1246,9 @@ const DataView = () => {
                             placeholder="Search transactions..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 pl-11 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
+                            className="w-full bg-white dark:bg-slate-900/50 border border-gray-300 dark:border-slate-700 rounded-xl px-4 py-3 pl-11 dark:text-white text-gray-900 placeholder-gray-500 dark:placeholder-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
                         />
-                        <div className="absolute left-3 top-3.5 text-gray-500">
+                        <div className="absolute left-3 top-3.5 text-gray-500 dark:text-gray-500 text-gray-400">
                             <SearchIcon />
                         </div>
                     </div>
@@ -1185,35 +1256,35 @@ const DataView = () => {
                         <select
                             value={filterStatus}
                             onChange={(e) => setFilterStatus(e.target.value)}
-                            className="px-4 py-3 rounded-xl text-sm font-medium bg-slate-700/50 text-gray-300 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all cursor-pointer"
+                            className="px-4 py-3 rounded-xl text-sm font-medium bg-white dark:bg-slate-700/50 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all cursor-pointer"
                         >
-                            <option value="all" className="bg-slate-800">All Status</option>
-                            <option value="Flagged" className="bg-slate-800">Flagged</option>
-                            <option value="Investigating" className="bg-slate-800">Investigating</option>
-                            <option value="Needs Review" className="bg-slate-800">Needs Review</option>
-                            <option value="Resolved" className="bg-slate-800">Resolved</option>
-                            <option value="No Action Required" className="bg-slate-800">No Action Required</option>
+                            <option value="all" className="bg-slate-800 dark:bg-slate-800 bg-white">All Status</option>
+                            <option value="Flagged" className="bg-slate-800 dark:bg-slate-800 bg-white">Flagged</option>
+                            <option value="Investigating" className="bg-slate-800 dark:bg-slate-800 bg-white">Investigating</option>
+                            <option value="Needs Review" className="bg-slate-800 dark:bg-slate-800 bg-white">Needs Review</option>
+                            <option value="Resolved" className="bg-slate-800 dark:bg-slate-800 bg-white">Resolved</option>
+                            <option value="No Action Required" className="bg-slate-800 dark:bg-slate-800 bg-white">No Action Required</option>
                         </select>
                         <select
                             value={filterMLCategory}
                             onChange={(e) => setFilterMLCategory(e.target.value)}
-                            className="px-4 py-3 rounded-xl text-sm font-medium bg-slate-700/50 text-gray-300 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all cursor-pointer"
+                            className="px-4 py-3 rounded-xl text-sm font-medium bg-white dark:bg-slate-700/50 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all cursor-pointer"
                         >
-                            <option value="all" className="bg-slate-800">All Risk Levels</option>
-                            <option value="Critical Risk" className="bg-slate-800">Critical Risk</option>
-                            <option value="High Risk" className="bg-slate-800">High Risk</option>
-                            <option value="Medium Risk" className="bg-slate-800">Medium Risk</option>
-                            <option value="Low Risk" className="bg-slate-800">Low Risk</option>
+                            <option value="all" className="bg-slate-800 dark:bg-slate-800 bg-white">All Risk Levels</option>
+                            <option value="Critical Risk" className="bg-slate-800 dark:bg-slate-800 bg-white">Critical Risk</option>
+                            <option value="High Risk" className="bg-slate-800 dark:bg-slate-800 bg-white">High Risk</option>
+                            <option value="Medium Risk" className="bg-slate-800 dark:bg-slate-800 bg-white">Medium Risk</option>
+                            <option value="Low Risk" className="bg-slate-800 dark:bg-slate-800 bg-white">Low Risk</option>
                         </select>
                     </div>
                 </div>
             </div>
 
             {/* Data Table */}
-            <div className="bg-gradient-to-br from-slate-800/80 to-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-2xl shadow-xl overflow-hidden">
+            <div className="bg-white dark:bg-gradient-to-br dark:from-slate-800/80 dark:to-slate-800/40 backdrop-blur-sm border border-gray-200 dark:border-slate-700/50 rounded-2xl shadow-xl overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="min-w-full text-base table-auto">
-                        <thead className="bg-slate-900/50 border-b border-slate-700">
+                        <thead className="bg-white dark:bg-slate-900/50 border-b border-gray-300 dark:border-slate-700">
                             <tr>
                                 <SortableHeader column="status" label="Status" minWidthClass="min-w-[120px]" />
                                 <SortableHeader column="ml_predicted_category" label="ML Prediction" minWidthClass="min-w-[150px]" />
@@ -1256,7 +1327,7 @@ const DataView = () => {
                                 <SortableHeader column="last_updated" label="Last Updated" minWidthClass="min-w-[150px]" />
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-700/50">
+                        <tbody className="divide-y divide-slate-700/50 dark:divide-slate-700/50 divide-gray-200">
                             {paginatedData.map((row, index) => {
                                 const transactionId = formatValue(row.transaction_id);
                                 const tagPlate = formatValue(row.tag_plate_number || row.tagPlate || row.tag_plate || row.plate_number);
@@ -1301,7 +1372,7 @@ const DataView = () => {
                                 return (
                                     <tr 
                                         key={row.transaction_id || row.id || index} 
-                                        className="hover:bg-slate-700/30 transition-colors duration-150 group"
+                                        className="hover:bg-slate-700/30 dark:hover:bg-slate-700/30 hover:bg-gray-100 transition-colors duration-150 group"
                                     >
                                         <td className="px-4 py-4 whitespace-nowrap">
                                             {status !== '-' ? (
@@ -1321,7 +1392,7 @@ const DataView = () => {
                                                     <option value="No Action Required" className="bg-slate-800 text-gray-400">No Action Required</option>
                                                 </select>
                                             ) : (
-                                                <span className="text-gray-400 text-base">-</span>
+                                                <span className="text-gray-400 dark:text-gray-400 text-gray-600 text-base">-</span>
                                             )}
                                         </td>
                                         <td className="px-4 py-4 whitespace-nowrap">
@@ -1335,31 +1406,31 @@ const DataView = () => {
                                                     {mlPredictedCategory}
                                                 </span>
                                             ) : (
-                                                <span className="text-gray-400 text-base">-</span>
+                                                <span className="text-gray-400 dark:text-gray-400 text-gray-600 text-base">-</span>
                                             )}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {isAnomaly}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {ruleBasedScore}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {mlPredictedScore}
                                         </td>
                                         <td className="px-4 py-4 whitespace-nowrap">
-                                            <span className="font-semibold text-white text-base">{amount}</span>
+                                            <span className="font-semibold dark:text-white text-gray-900 text-base">{amount}</span>
                                         </td>
                                         <td className="px-4 py-4 whitespace-nowrap">
-                                            <span className="font-mono text-gray-100 font-medium text-sm">{transactionId}</span>
+                                            <span className="font-mono text-gray-100 dark:text-gray-100 text-gray-800 font-medium text-sm">{transactionId}</span>
                                         </td>
                                         <td className="px-4 py-4 whitespace-nowrap">
-                                            <span className="font-mono text-gray-100 font-medium text-base">{tagPlate}</span>
+                                            <span className="font-mono text-gray-100 dark:text-gray-100 text-gray-800 font-medium text-base">{tagPlate}</span>
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {transactionDate}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {postingDate}
                                         </td>
                                         <td className="px-4 py-4 whitespace-nowrap">
@@ -1371,91 +1442,91 @@ const DataView = () => {
                                                     {agency}
                                                 </span>
                                             ) : (
-                                                <span className="text-gray-400 text-base">-</span>
+                                                <span className="text-gray-400 dark:text-gray-400 text-gray-600 text-base">-</span>
                                             )}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {stateName}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {routeName}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {routeInstate}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {entryTime}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {entryPlaza}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {entryLane}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {exitTime}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {exitPlaza}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {exitLane}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {vehicleType}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {planRate}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {fareType}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {distanceMiles}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {travelTimeMinutes}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {speedMph}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {travelCategory}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {isImpossibleTravel}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {isRapidSuccession}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {flagRushHour}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {flagIsWeekend}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {flagIsHoliday}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {flagOverlappingJourney}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {flagDriverAmountOutlier}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {flagRouteAmountOutlier}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {flagAmountUnusuallyHigh}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {flagDriverSpendSpike}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {predictionTimestamp}
                                         </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 text-base">
+                                        <td className="px-4 py-4 whitespace-nowrap text-gray-300 dark:text-gray-300 text-gray-700 text-base">
                                             {lastUpdated}
                                         </td>
                                     </tr>
@@ -1466,13 +1537,13 @@ const DataView = () => {
                 </div>
                 
                 {/* Pagination */}
-                <div className="bg-slate-900/50 px-6 py-4 border-t border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="text-sm text-gray-400">
-                        Showing <span className="font-semibold text-white">
+                <div className="bg-white dark:bg-slate-900/50 px-6 py-4 border-t border-gray-300 dark:border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="text-sm text-gray-400 dark:text-gray-400 text-gray-600">
+                        Showing <span className="font-semibold dark:text-white text-gray-900">
                             {paginatedData.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}
-                        </span> to <span className="font-semibold text-white">
+                        </span> to <span className="font-semibold dark:text-white text-gray-900">
                             {Math.min(currentPage * itemsPerPage, filteredData.length)}
-                        </span> of <span className="font-semibold text-white">{filteredData.length}</span> transactions
+                        </span> of <span className="font-semibold dark:text-white text-gray-900">{filteredData.length}</span> transactions
                     </div>
                     <div className="flex items-center space-x-2">
                         <button 
@@ -1480,8 +1551,8 @@ const DataView = () => {
                             disabled={currentPage === 1 || totalPages === 0}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                                 currentPage === 1 || totalPages === 0
-                                    ? 'bg-slate-700/30 text-gray-500 cursor-not-allowed' 
-                                    : 'bg-slate-700/50 text-gray-300 hover:bg-slate-700 hover:text-white'
+                                    ? 'bg-slate-700/30 dark:bg-slate-700/30 bg-gray-200 text-gray-500 dark:text-gray-500 text-gray-400 cursor-not-allowed' 
+                                    : 'bg-slate-700/50 dark:bg-slate-700/50 bg-gray-200 text-gray-300 dark:text-gray-300 text-gray-700 hover:bg-slate-700 dark:hover:bg-slate-700 hover:bg-gray-300 hover:text-white dark:hover:text-white hover:text-gray-900'
                             }`}
                         >
                             Previous
@@ -1509,7 +1580,7 @@ const DataView = () => {
                                             className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                                                 currentPage === pageNum 
                                                     ? 'bg-teal-600 text-white ring-2 ring-teal-500/50' 
-                                                    : 'bg-slate-700/50 text-gray-400 hover:bg-slate-700 hover:text-white'
+                                                    : 'bg-slate-700/50 dark:bg-slate-700/50 bg-gray-200 text-gray-400 dark:text-gray-400 text-gray-600 hover:bg-slate-700 dark:hover:bg-slate-700 hover:bg-gray-300 hover:text-white dark:hover:text-white hover:text-gray-900'
                                             }`}
                                         >
                                             {pageNum}
@@ -1524,8 +1595,8 @@ const DataView = () => {
                             disabled={currentPage === totalPages || totalPages === 0}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                                 currentPage === totalPages || totalPages === 0
-                                    ? 'bg-slate-700/30 text-gray-500 cursor-not-allowed' 
-                                    : 'bg-slate-700/50 text-gray-300 hover:bg-slate-700 hover:text-white'
+                                    ? 'bg-slate-700/30 dark:bg-slate-700/30 bg-gray-200 text-gray-500 dark:text-gray-500 text-gray-400 cursor-not-allowed' 
+                                    : 'bg-slate-700/50 dark:bg-slate-700/50 bg-gray-200 text-gray-300 dark:text-gray-300 text-gray-700 hover:bg-slate-700 dark:hover:bg-slate-700 hover:bg-gray-300 hover:text-white dark:hover:text-white hover:text-gray-900'
                             }`}
                         >
                             Next
@@ -1537,24 +1608,72 @@ const DataView = () => {
     );
 };
 
+// --- Theme Toggle Icon Components ---
+const SunIcon = () => (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+    </svg>
+);
+
+const MoonIcon = () => (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+    </svg>
+);
+
 // --- Main App Component ---
 
 export default function App() {
     const [activeView, setActiveView] = useState('dashboard');
+    const [isDarkMode, setIsDarkMode] = useState(() => {
+        // Check localStorage first, then default to light mode
+        const saved = localStorage.getItem('theme');
+        if (saved) {
+            return saved === 'dark';
+        }
+        return false; // Default to light mode
+    });
+
+    useEffect(() => {
+        // Apply theme class to document root
+        if (isDarkMode) {
+            document.documentElement.classList.add('dark');
+            localStorage.setItem('theme', 'dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+            localStorage.setItem('theme', 'light');
+        }
+    }, [isDarkMode]);
+
+    const toggleTheme = () => {
+        setIsDarkMode(!isDarkMode);
+    };
 
     return (
-        <div className="relative min-h-screen bg-slate-950 text-gray-200" style={{ fontFamily: "'Inter', sans-serif" }}>
+        <div className={`relative min-h-screen transition-colors duration-300 ${
+            isDarkMode 
+                ? 'bg-slate-950 text-gray-200' 
+                : 'bg-gray-50 text-gray-900'
+        }`} style={{ fontFamily: "'Inter', sans-serif" }}>
             {/* Animated Background */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute -top-1/2 -right-1/2 w-full h-full rounded-full blur-3xl animate-pulse bg-gradient-to-br from-teal-500/10 via-cyan-500/5 to-transparent"></div>
-                <div className="absolute -bottom-1/2 -left-1/2 w-full h-full rounded-full blur-3xl animate-pulse bg-gradient-to-tr from-blue-500/10 via-teal-500/5 to-transparent" style={{animationDelay: '1s'}}></div>
+                <div className={`absolute -top-1/2 -right-1/2 w-full h-full rounded-full blur-3xl animate-pulse ${
+                    isDarkMode 
+                        ? 'bg-gradient-to-br from-teal-500/10 via-cyan-500/5 to-transparent' 
+                        : 'bg-gradient-to-br from-teal-500/5 via-cyan-500/3 to-transparent'
+                }`}></div>
+                <div className={`absolute -bottom-1/2 -left-1/2 w-full h-full rounded-full blur-3xl animate-pulse ${
+                    isDarkMode 
+                        ? 'bg-gradient-to-tr from-blue-500/10 via-teal-500/5 to-transparent' 
+                        : 'bg-gradient-to-tr from-blue-500/5 via-teal-500/3 to-transparent'
+                }`} style={{animationDelay: '1s'}}></div>
             </div>
 
             <div className="relative z-10 p-4 sm:p-6 lg:p-8">
                 <div className="max-w-7xl mx-auto">
                     {/* Header */}
                     <header className="mb-8">
-                        <div className="bg-gradient-to-r from-slate-800/50 via-slate-800/30 to-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-6 shadow-2xl">
+                        <div className="bg-white dark:bg-gradient-to-r dark:from-slate-800/50 dark:via-slate-800/30 dark:to-slate-800/50 backdrop-blur-xl border border-gray-200 dark:border-slate-700/50 rounded-2xl p-6 shadow-2xl">
                             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
                                 {/* Logo and Title */}
                                 <div className="flex items-center space-x-4">
@@ -1562,44 +1681,56 @@ export default function App() {
                                         <ShieldIcon />
                                     </div>
                                     <div>
-                                        <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-white via-gray-100 to-gray-300 bg-clip-text text-transparent">
+                                        <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:bg-gradient-to-r dark:from-white dark:via-gray-100 dark:to-gray-300 dark:bg-clip-text dark:text-transparent">
                                             EZ Pass Fraud Detection
                                         </h1>
-                                        <p className="text-sm text-gray-400 mt-1">New Jersey Courts</p>
+                                        <p className="text-sm text-gray-400 dark:text-gray-400 text-gray-600 mt-1">New Jersey Courts</p>
                                     </div>
                                 </div>
 
-                                {/* Navigation Toggle */}
-                                <div className="flex items-center p-1.5 rounded-xl bg-slate-900/50 backdrop-blur-sm border border-slate-700/50 shadow-inner">
-                                    <button 
-                                        onClick={() => setActiveView('dashboard')} 
-                                        className={`px-6 py-2.5 text-sm font-semibold rounded-lg focus:outline-none transition-all duration-300 ${
-                                            activeView === 'dashboard' 
-                                                ? 'bg-gradient-to-r from-teal-600 to-teal-700 text-white' 
-                                                : 'text-gray-400 hover:text-white'
-                                        }`}
+                                {/* Navigation and Theme Toggle */}
+                                <div className="flex items-center gap-4">
+                                    {/* Navigation Toggle */}
+                                    <div className="flex items-center p-1.5 rounded-xl bg-white dark:bg-slate-900/50 backdrop-blur-sm border border-gray-200 dark:border-slate-700/50 shadow-inner">
+                                        <button 
+                                            onClick={() => setActiveView('dashboard')} 
+                                            className={`px-6 py-2.5 text-sm font-semibold rounded-lg focus:outline-none transition-all duration-300 ${
+                                                activeView === 'dashboard' 
+                                                    ? 'bg-gradient-to-r from-teal-600 to-teal-700 text-white' 
+                                                    : 'text-gray-400 dark:text-gray-400 text-gray-600 hover:text-white dark:hover:text-white hover:text-gray-900'
+                                            }`}
+                                        >
+                                            Dashboard
+                                        </button>
+                                        <button 
+                                            onClick={() => setActiveView('data')} 
+                                            className={`px-6 py-2.5 text-sm font-semibold rounded-lg focus:outline-none transition-all duration-300 ${
+                                                activeView === 'data' 
+                                                    ? 'bg-gradient-to-r from-teal-600 to-teal-700 text-white' 
+                                                    : 'text-gray-400 dark:text-gray-400 text-gray-600 hover:text-white dark:hover:text-white hover:text-gray-900'
+                                            }`}
+                                        >
+                                            Transactions
+                                        </button>
+                                        <button 
+                                            onClick={() => setActiveView('charts')} 
+                                            className={`px-6 py-2.5 text-sm font-semibold rounded-lg focus:outline-none transition-all duration-300 ${
+                                                activeView === 'charts' 
+                                                    ? 'bg-gradient-to-r from-teal-600 to-teal-700 text-white' 
+                                                    : 'text-gray-400 dark:text-gray-400 text-gray-600 hover:text-white dark:hover:text-white hover:text-gray-900'
+                                            }`}
+                                        >
+                                            Charts
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Theme Toggle */}
+                                    <button
+                                        onClick={toggleTheme}
+                                        className="p-2.5 rounded-xl bg-white dark:bg-slate-900/50 backdrop-blur-sm border border-gray-200 dark:border-slate-700/50 text-gray-600 dark:text-gray-400 hover:text-teal-600 dark:hover:text-teal-400 hover:bg-gray-100 dark:hover:bg-slate-800/50 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                                        aria-label="Toggle theme"
                                     >
-                                        Dashboard
-                                    </button>
-                                    <button 
-                                        onClick={() => setActiveView('data')} 
-                                        className={`px-6 py-2.5 text-sm font-semibold rounded-lg focus:outline-none transition-all duration-300 ${
-                                            activeView === 'data' 
-                                                ? 'bg-gradient-to-r from-teal-600 to-teal-700 text-white' 
-                                                : 'text-gray-400 hover:text-white'
-                                        }`}
-                                    >
-                                        Transactions
-                                    </button>
-                                    <button 
-                                        onClick={() => setActiveView('charts')} 
-                                        className={`px-6 py-2.5 text-sm font-semibold rounded-lg focus:outline-none transition-all duration-300 ${
-                                            activeView === 'charts' 
-                                                ? 'bg-gradient-to-r from-teal-600 to-teal-700 text-white' 
-                                                : 'text-gray-400 hover:text-white'
-                                        }`}
-                                    >
-                                        Charts
+                                        {isDarkMode ? <SunIcon /> : <MoonIcon />}
                                     </button>
                                 </div>
                             </div>
