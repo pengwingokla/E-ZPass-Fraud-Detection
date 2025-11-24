@@ -9,12 +9,14 @@ test.describe('EZPass Dashboard', () => {
 
     test('shows loading message when filtering transactions', async ({ page }) => {
         await page.goto('http://localhost:3000');
-        await page.click('text=📋 Raw Data');
-        await page.click('button:text("Flagged")');
+        // Click on Transactions navigation button
+        await page.click('button:text("Transactions")');
+        // Select "Flagged" from the status filter dropdown (first select element in the filters)
+        await page.locator('select').first().selectOption('Flagged');
 
-        // Wait up to 3 seconds for the loading message to appear
+        // Wait up to 3 seconds for the search input to appear
         await page.waitForSelector('input[placeholder="Search transactions..."]', { timeout: 3000 });
-        //await expect(page.locator('input[placeholder="Search transactions..."]')).toBeVisible();
+        await expect(page.locator('input[placeholder="Search transactions..."]')).toBeVisible();
     });
 
 
