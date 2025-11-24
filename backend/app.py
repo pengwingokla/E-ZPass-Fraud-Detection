@@ -66,6 +66,51 @@ def alerts():
     rows = [dict(row) for row in results]
     return jsonify({"data": rows})
 
+#Get recent flagged transactions for homepage card
+@app.route("/api/transactions/recent-flagged")
+def recent_flagged():
+    query = """
+    SELECT 
+        transaction_id,
+        transaction_date,
+        tag_plate_number,
+        agency,
+        amount,
+        status,
+        ml_predicted_category,
+        is_anomaly
+    FROM `njc-ezpass.ezpass_data.master_viz` 
+    WHERE (status = 'Needs Review' OR is_anomaly = 1)
+    ORDER BY transaction_date DESC
+    LIMIT 3
+    """
+    try:
+        results = client.query(query).result()
+        rows = []
+        for row in results:
+            # Use actual status from database
+            status = row.get('status')
+            
+            # Map ml_predicted_category to category, with fallback
+            category = row.get('ml_predicted_category') or 'Anomaly Detected'
+            
+            rows.append({
+                'id': row.get('transaction_id'),
+                'transaction_id': row.get('transaction_id'),
+                'transaction_date': str(row.get('transaction_date')) if row.get('transaction_date') else None,
+                'tag_plate_number': row.get('tag_plate_number'),
+                'tagPlate': row.get('tag_plate_number'),  # Also include tagPlate for compatibility
+                'agency': row.get('agency'),
+                'amount': float(row.get('amount')) if row.get('amount') is not None else 0.0,
+                'status': status,
+                'category': category,
+                'is_anomaly': bool(row.get('is_anomaly'))
+            })
+        return jsonify({"data": rows})
+    except Exception as e:
+        print(f"Error fetching recent flagged transactions: {str(e)}")
+        return jsonify({"data": [], "error": str(e)}), 500
+
 #Aggregated metrics for dashboard cards
 @app.route("/api/metrics")
 def metrics():
