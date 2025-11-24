@@ -1,0 +1,20 @@
+version: 2
+
+sources:
+  - name: ezpass_predictions
+    description: "ML model predictions from the fraud detection pipeline"
+    database: njc-ezpass
+    schema: ezpass_data
+    tables:
+      - name: fraud_predictions
+        description: "Fraud predictions with anomaly scores and features"
+        columns:
+          - name: transaction_id
+            description: "Unique transaction identifier"
+          - name: is_anomaly
+            description: "Binary flag: 1 if anomaly detected, 0 otherwise"
+          - name: ml_anomaly_score
+            description: "Anomaly score from Isolation Forest (-1 to 1)"
+          - name: prediction_timestamp
+            description: "When the prediction was made"
+

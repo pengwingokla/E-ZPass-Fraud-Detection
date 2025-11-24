@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MockPass Login</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="login-body">
+
+    <!-- Header -->
+    <header class="login-header">
+        <div class="login-container">
+            <div class="login-brand">
+                <div class="logo">MP</div>
+                <h1>MockPass</h1>
+
+                <!-- Login button triggers modal -->
+                <button class="main-login-btn" onclick="openLoginModal()">Log In</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Page content -->
+    <main class="login-container">
+        <h2>Welcome to MockPass</h2>
+        <p>Click Login to access your toll dashboard.</p>
+    </main>
+
+    <!-- ========================= -->
+    <!--   E-ZPass Style MODAL     -->
+    <!-- ========================= -->
+    <div id="register_box_front" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeLoginModal()">✕</button>
+
+            <h2>Log In / Register</h2>
+            <p class="modal-note">Note: Username is not case sensitive</p>
+
+            <form id="modal-login-form">
+
+                <input id="modal-username" 
+                       class="modal-input" 
+                       type="text" 
+                       placeholder="Username / Account Number / Tag Number"
+                       required>
+
+                <input id="modal-password" 
+                       class="modal-input" 
+                       type="password" 
+                       placeholder="Password"
+                       required>
+
+                <label class="captcha-label">Security Message</label>
+
+                <div class="captcha-row">
+                    <span id="modal-captcha-value" class="modal-captcha"></span>
+                    <button type="button" id="modal-refresh-captcha" class="modal-refresh">Refresh</button>
+                </div>
+
+                <input id="modal-captcha-input" 
+                       class="modal-input" 
+                       type="text" 
+                       maxlength="4" 
+                       placeholder="Enter Security Message"
+                       required>
+
+                <div id="modal-error" class="modal-error"></div>
+
+                <button type="submit" class="modal-login-btn">Log In</button>
+
+            </form>
+
+            <a href="#" class="modal-link">Forgot your password?</a>
+            <a href="#" class="modal-link">Register your account online.</a>
+        </div>
+    </div>
+
+    <!-- JS -->
+    <script src="login.js"></script>
+
+</body>
+</html>

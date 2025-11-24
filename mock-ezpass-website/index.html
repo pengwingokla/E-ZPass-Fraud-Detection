@@ -1,6 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script>
+document.addEventListener("DOMContentLoaded", () => {
+    const auth = sessionStorage.getItem("mockAuth");
+
+    if (!auth || auth !== "true") {
+        window.location.replace("login.html");
+    }
+});
+</script>
+
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MockPass - NJ Toll Dashboard</title>
@@ -17,6 +28,9 @@
             <div class="nav-brand">
                 <div class="logo">MP</div>
                 <h1>MockPass</h1>
+                <button class="logout-btn" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i> Log Out
+                </button>
             </div>
         </div>
     </header>

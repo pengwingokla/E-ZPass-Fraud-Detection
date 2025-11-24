@@ -1,0 +1,111 @@
+version: 2
+
+models:
+  - name: gold_train
+    description: >
+      Training dataset for ML fraud detection model. Contains only the features 
+      used for model training, derived from the gold layer. This table is optimized 
+      for machine learning workflows and includes velocity features, driver behavior 
+      stats, route features, and contextual information.
+    
+    columns:
+      # ===== CORE IDENTIFIERS =====
+      - name: transaction_id
+        description: Unique identifier for each transaction
+        tests:
+          - unique
+          - not_null
+
+      - name: transaction_date
+        description: Date when the transaction occurred
+        tests:
+          - not_null
+
+      - name: tag_plate_number
+        description: EZ-Pass tag or license plate number
+        tests:
+          - not_null
+
+      # ===== VELOCITY & TRAVEL FEATURES =====
+      - name: distance_miles
+        description: Distance traveled between entry and exit plazas in miles
+
+      - name: travel_time_minutes
+        description: Time taken to travel between entry and exit in minutes
+
+      - name: speed_mph
+        description: Average speed calculated from distance and travel time (mph)
+
+      - name: is_impossible_travel
+        description: Flag indicating if the speed exceeds physically possible limits (>100 mph)
+
+      - name: is_rapid_succession
+        description: Flag indicating if this transaction occurred too quickly after the previous one
+
+      - name: flag_overlapping_journey
+        description: Flag indicating if this journey overlaps with another transaction
+
+      - name: overlapping_journey_duration_minutes
+        description: Duration of journey overlap in minutes, if applicable
+
+      # ===== DRIVER ROLLING STATS =====
+      - name: driver_amount_last_30txn_avg
+        description: Average transaction amount for driver's last 30 transactions
+
+      - name: driver_amount_last_30txn_std
+        description: Standard deviation of transaction amounts for driver's last 30 transactions
+
+      - name: driver_amount_last_30txn_count
+        description: Count of transactions in the driver's rolling 30-transaction window
+
+      - name: driver_daily_txn_count
+        description: Number of transactions for this tag/plate on this date
+
+      # ===== GOLD LAYER: DRIVER FEATURES =====
+      - name: driver_amount_modified_z_score
+        description: >
+          Modified z-score showing how many standard deviations this transaction amount 
+          is from the driver's historical median (robust to outliers)
+
+      - name: amount_deviation_from_avg_pct
+        description: Percentage deviation of this transaction from driver's 30-txn average
+
+      - name: amount_deviation_from_median_pct
+        description: Percentage deviation of this transaction from driver's historical median
+
+      - name: driver_today_spend
+        description: Total amount spent by this driver on this date
+
+      - name: driver_avg_daily_spend_30d
+        description: Driver's average daily spending over the past 30 days
+
+      # ===== GOLD LAYER: ROUTE FEATURES =====
+      - name: route_amount_z_score
+        description: Z-score showing how this transaction amount deviates from typical amounts for this route
+
+      # ===== TIME & CONTEXT =====
+      - name: entry_hour
+        description: Hour of day when entering the toll (0-23)
+
+      - name: exit_hour
+        description: Hour of day when exiting the toll (0-23)
+
+      - name: travel_time_of_day
+        description: Time period classification (Morning, Afternoon, Evening, Night, Late Night)
+
+      - name: flag_rush_hour
+        description: Boolean flag indicating if transaction occurred during rush hour
+
+      - name: is_weekend
+        description: Boolean flag indicating if transaction occurred on weekend
+
+      # ===== FINANCIAL =====
+      - name: amount
+        description: Transaction amount in dollars
+        tests:
+          - not_null
+
+      # ===== VEHICLE =====
+      - name: is_commercial_vehicle
+        description: Boolean flag indicating if vehicle is classified as commercial (Light or Heavy Commercial)
+
