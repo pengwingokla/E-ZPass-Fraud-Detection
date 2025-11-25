@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Chart, registerables } from 'chart.js';
 import Plot from 'react-plotly.js';
+import { useMsal, useIsAuthenticated } from "@azure/msal-react";
+import { loginRequest } from "./authConfig";
+
 Chart.register(...registerables);
-
-
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -56,14 +57,6 @@ const fetchRecentFlaggedTransactions = async () => {
     }
 };
 
-
-/*
-const recentAlerts = [
-    { time: '2 min ago', message: 'High-risk transaction detected', type: 'critical' },
-    { time: '5 min ago', message: 'Card skimming pattern identified', type: 'warning' },
-    { time: '12 min ago', message: 'Account takeover attempt blocked', type: 'critical' },
-];
-*/
 // --- Icon Components ---
 const ShieldIcon = () => (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -107,19 +100,6 @@ const SortIcon = () => (
     </svg>
 );
 
-/*
-const TrendUpIcon = () => (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-    </svg>
-);
-
-const TrendDownIcon = () => (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
-    </svg>
-);
-*/
 // --- Chart Components ---
 
 const getChartOptions = (isDarkMode) => ({
@@ -195,17 +175,13 @@ const BarChart = () => {
             try {
                 const data = await fetchMonthlyChartData();
                 if (data && data.length > 0) {
-                    // Extract labels and data
-                    // Check if data spans multiple years - if so, include year in labels
                     const uniqueYears = new Set(data.map(item => item.year));
                     const showYear = uniqueYears.size > 1;
                     
                     const labels = data.map(item => {
                         if (showYear) {
-                            // Show "Apr 2025" format when multiple years
                             return item.month;
                         } else {
-                            // Show just "Apr" when single year
                             const monthParts = item.month.split(' ');
                             return monthParts[0];
                         }
@@ -219,7 +195,6 @@ const BarChart = () => {
                         fraudAlerts
                     });
                 } else {
-                    // Default empty data
                     setChartData({
                         labels: [],
                         totalTransactions: [],
@@ -246,7 +221,6 @@ const BarChart = () => {
 
         const ctx = chartRef.current.getContext('2d');
         
-        // Destroy existing chart if it exists
         Chart.getChart(chartRef.current)?.destroy();
         chartInstanceRef.current = null;
         
@@ -272,7 +246,6 @@ const BarChart = () => {
             }
         ];
 
-        // Always show fraud alerts dataset, even if all zeros (ready for when fraud detection is implemented)
         datasets.push({
             label: 'Fraud Alerts',
             data: chartData.fraudAlerts,
@@ -346,36 +319,34 @@ const CategoryChart = () => {
         return () => observer.disconnect();
     }, []);
 
-    // Color mapping for different fraud categories - using vibrant colors visible in light mode
     const getCategoryColor = (category, index) => {
         const colorMap = {
-            'Holiday': 'rgba(239, 68, 68, 0.9)', // Red
-            'Out of State': 'rgba(14, 165, 233, 0.9)', // Sky Blue
-            'Vehicle Type > 2': 'rgba(168, 85, 247, 0.9)', // Purple
-            'Weekend': 'rgba(236, 72, 153, 0.9)', // Pink
-            'Driver Amount Outlier': 'rgba(59, 130, 246, 0.9)', // Blue
-            'Rush Hour': 'rgba(34, 197, 94, 0.9)', // Green
-            'Amount Unusually High': 'rgba(251, 146, 60, 0.9)', // Orange
-            'Route Amount Outlier': 'rgba(139, 92, 246, 0.9)', // Violet
-            'Driver Spend Spike': 'rgba(149, 70, 167, 0.9)', // Purple
-            'Overlapping Journey': 'rgba(245, 158, 11, 0.9)', // Amber
-            'Possible Cloning': 'rgba(168, 85, 247, 0.9)', // Purple
-            'Toll Evasion': 'rgba(239, 68, 68, 0.9)', // Red
-            'Account Takeover': 'rgba(220, 38, 38, 0.9)', // Dark Red
-            'Card Skimming': 'rgba(236, 72, 153, 0.9)' // Pink
+            'Holiday': 'rgba(239, 68, 68, 0.9)',
+            'Out of State': 'rgba(14, 165, 233, 0.9)',
+            'Vehicle Type > 2': 'rgba(168, 85, 247, 0.9)',
+            'Weekend': 'rgba(236, 72, 153, 0.9)',
+            'Driver Amount Outlier': 'rgba(59, 130, 246, 0.9)',
+            'Rush Hour': 'rgba(34, 197, 94, 0.9)',
+            'Amount Unusually High': 'rgba(251, 146, 60, 0.9)',
+            'Route Amount Outlier': 'rgba(139, 92, 246, 0.9)',
+            'Driver Spend Spike': 'rgba(149, 70, 167, 0.9)',
+            'Overlapping Journey': 'rgba(245, 158, 11, 0.9)',
+            'Possible Cloning': 'rgba(168, 85, 247, 0.9)',
+            'Toll Evasion': 'rgba(239, 68, 68, 0.9)',
+            'Account Takeover': 'rgba(220, 38, 38, 0.9)',
+            'Card Skimming': 'rgba(236, 72, 153, 0.9)'
         };
-        // Fallback colors - using vibrant, distinct colors that are visible in light mode
         const fallbackColors = [
-            'rgba(59, 130, 246, 0.9)',   // Blue
-            'rgba(34, 197, 94, 0.9)',   // Green
-            'rgba(251, 146, 60, 0.9)',  // Orange
-            'rgba(139, 92, 246, 0.9)',  // Violet
-            'rgba(149, 70, 167, 0.9)',  // Purple
-            'rgba(245, 158, 11, 0.9)',  // Amber
-            'rgba(239, 68, 68, 0.9)',   // Red
-            'rgba(236, 72, 153, 0.9)',  // Pink
-            'rgba(168, 85, 247, 0.9)',  // Purple
-            'rgba(14, 165, 233, 0.9)'   // Sky Blue
+            'rgba(59, 130, 246, 0.9)',
+            'rgba(34, 197, 94, 0.9)',
+            'rgba(251, 146, 60, 0.9)',
+            'rgba(139, 92, 246, 0.9)',
+            'rgba(149, 70, 167, 0.9)',
+            'rgba(245, 158, 11, 0.9)',
+            'rgba(239, 68, 68, 0.9)',
+            'rgba(236, 72, 153, 0.9)',
+            'rgba(168, 85, 247, 0.9)',
+            'rgba(14, 165, 233, 0.9)'
         ];
         return colorMap[category] || fallbackColors[index % fallbackColors.length];
     };
@@ -420,11 +391,9 @@ const CategoryChart = () => {
     useEffect(() => {
         if (!chartRef.current || !chartData || loading) return;
 
-        // Destroy existing chart if it exists
         Chart.getChart(chartRef.current)?.destroy();
         chartInstanceRef.current = null;
 
-        // Don't render chart if no data
         if (chartData.labels.length === 0) {
             return;
         }
@@ -584,64 +553,10 @@ const SeverityChart = () => {
         });
         return () => chart.destroy();
     }, [isDarkMode]);
+
     return <div className="h-80 w-full flex justify-center items-center"><canvas ref={chartRef}></canvas></div>;
 };
 
-// --- Risk Gauge Component ---
-
-/*
-const RiskGauge = ({ score, label }) => {
-    const getColor = (score) => {
-        if (score >= 80) return { bg: 'from-red-500 to-rose-600', text: 'text-red-400', ring: 'ring-red-500/20' };
-        if (score >= 50) return { bg: 'from-orange-500 to-amber-600', text: 'text-orange-400', ring: 'ring-orange-500/20' };
-        return { bg: 'from-emerald-500 to-green-600', text: 'text-emerald-400', ring: 'ring-emerald-500/20' };
-    };
-    
-    const colors = getColor(score);
-    const circumference = 2 * Math.PI * 45;
-    const offset = circumference - (score / 100) * circumference;
-    
-    return (
-        <div className="flex flex-col items-center">
-            <div className="relative w-28 h-28">
-                <svg className="transform -rotate-90 w-28 h-28">
-                    <circle
-                        cx="56"
-                        cy="56"
-                        r="45"
-                        stroke="currentColor"
-                        strokeWidth="8"
-                        fill="none"
-                        className="text-slate-700"
-                    />
-                    <circle
-                        cx="56"
-                        cy="56"
-                        r="45"
-                        stroke="url(#gradient)"
-                        strokeWidth="8"
-                        fill="none"
-                        strokeDasharray={circumference}
-                        strokeDashoffset={offset}
-                        strokeLinecap="round"
-                        className="transition-all duration-1000 ease-out"
-                    />
-                    <defs>
-                        <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" className={colors.bg.split(' ')[0].replace('from-', 'stop-')} />
-                            <stop offset="100%" className={colors.bg.split(' ')[1].replace('to-', 'stop-')} />
-                        </linearGradient>
-                    </defs>
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                    <span className={`text-2xl font-bold ${colors.text}`}>{score}</span>
-                </div>
-            </div>
-            <span className="mt-2 text-sm text-gray-400 font-medium">{label}</span>
-        </div>
-    );
-};
-*/
 // --- View Components ---
 
 const DashboardView = ({ setActiveView }) => {
@@ -650,7 +565,6 @@ const DashboardView = ({ setActiveView }) => {
     
     useEffect(() => {
         setAnimate(true);
-        // Fetch recent flagged transactions from BigQuery
         fetchRecentFlaggedTransactions().then(data => {
             setRecentFlaggedTransactions(data);
         });
@@ -717,7 +631,6 @@ const DashboardView = ({ setActiveView }) => {
                             </div>
                         ) : (
                             recentFlaggedTransactions.map((txn) => {
-                                // Determine styling based on actual status
                                 const isInvestigating = txn.status === 'Investigating' || txn.status === 'Needs Review';
                                 return (
                                     <div key={txn.id || txn.transaction_id} className={`p-4 rounded-xl border transition-all duration-300 hover:scale-105 cursor-pointer ${
@@ -828,13 +741,12 @@ const ScatterPlot = () => {
         return <div className="text-gray-400 dark:text-gray-400 text-gray-600">No data available for scatter plot</div>;
     }
 
-    // Group data by risk level
     const riskLevels = ['Critical Risk', 'High Risk', 'Medium Risk', 'Low Risk'];
     const colorMap = {
-        'Critical Risk': 'rgb(220, 38, 38)',      // Red
-        'High Risk': 'rgb(255, 140, 0)',          // Orange/Coral
-        'Medium Risk': 'rgb(59, 130, 246)',       // Blue
-        'Low Risk': 'rgb(34, 197, 94)'            // Green
+        'Critical Risk': 'rgb(220, 38, 38)',
+        'High Risk': 'rgb(255, 140, 0)',
+        'Medium Risk': 'rgb(59, 130, 246)',
+        'Low Risk': 'rgb(34, 197, 94)'
     };
 
     const traces = riskLevels.map(riskLevel => {
@@ -855,7 +767,7 @@ const ScatterPlot = () => {
                 }
             }
         };
-    }).filter(trace => trace.x.length > 0); // Remove empty traces
+    }).filter(trace => trace.x.length > 0);
 
     const layout = {
         title: {
@@ -925,56 +837,49 @@ const ChartsView = () => {
 };
 
 const DataView = () => {
-    // Color mapping for ML prediction categories - matching CategoryChart colors and risk levels
     const getMLPredictionColor = (category) => {
         if (!category || category === '-') return null;
         const colorMap = {
-            // Risk Levels (matching ScatterPlot colors)
-            'Critical Risk': 'rgb(220, 38, 38)', // Red
-            'High Risk': 'rgb(255, 140, 0)', // Orange/Coral
-            'Medium Risk': 'rgb(59, 130, 246)', // Blue
-            'Low Risk': 'rgb(34, 197, 94)', // Green
-            // Fraud Categories
-            'Holiday': 'rgba(239, 68, 68, 1)', // Red
-            'Out of State': 'rgba(14, 165, 233, 1)', // Sky Blue
-            'Vehicle Type > 2': 'rgba(168, 85, 247, 1)', // Purple
-            'Weekend': 'rgba(236, 72, 153, 1)', // Pink
-            'Driver Amount Outlier': 'rgba(59, 130, 246, 1)', // Blue
-            'Rush Hour': 'rgba(34, 197, 94, 1)', // Green
-            'Amount Unusually High': 'rgba(251, 146, 60, 1)', // Orange
-            'Route Amount Outlier': 'rgba(139, 92, 246, 1)', // Violet
-            'Driver Spend Spike': 'rgba(149, 70, 167, 1)', // Purple
-            'Overlapping Journey': 'rgba(245, 158, 11, 1)', // Amber
-            'Possible Cloning': 'rgba(168, 85, 247, 1)', // Purple
-            'Toll Evasion': 'rgba(239, 68, 68, 1)', // Red
-            'Account Takeover': 'rgba(220, 38, 38, 1)', // Dark Red
-            'Card Skimming': 'rgba(236, 72, 153, 1)' // Pink
+            'Critical Risk': 'rgb(220, 38, 38)',
+            'High Risk': 'rgb(255, 140, 0)',
+            'Medium Risk': 'rgb(59, 130, 246)',
+            'Low Risk': 'rgb(34, 197, 94)',
+            'Holiday': 'rgba(239, 68, 68, 1)',
+            'Out of State': 'rgba(14, 165, 233, 1)',
+            'Vehicle Type > 2': 'rgba(168, 85, 247, 1)',
+            'Weekend': 'rgba(236, 72, 153, 1)',
+            'Driver Amount Outlier': 'rgba(59, 130, 246, 1)',
+            'Rush Hour': 'rgba(34, 197, 94, 1)',
+            'Amount Unusually High': 'rgba(251, 146, 60, 1)',
+            'Route Amount Outlier': 'rgba(139, 92, 246, 1)',
+            'Driver Spend Spike': 'rgba(149, 70, 167, 1)',
+            'Overlapping Journey': 'rgba(245, 158, 11, 1)',
+            'Possible Cloning': 'rgba(168, 85, 247, 1)',
+            'Toll Evasion': 'rgba(239, 68, 68, 1)',
+            'Account Takeover': 'rgba(220, 38, 38, 1)',
+            'Card Skimming': 'rgba(236, 72, 153, 1)'
         };
-        // Try exact match first
         if (colorMap[category]) return colorMap[category];
-        // Try case-insensitive match
         const categoryLower = category.toLowerCase();
         for (const [key, value] of Object.entries(colorMap)) {
             if (key.toLowerCase() === categoryLower) return value;
         }
-        // Check if it contains risk level keywords
-        if (categoryLower.includes('critical')) return 'rgb(220, 38, 38)'; // Red
-        if (categoryLower.includes('high')) return 'rgb(255, 140, 0)'; // Orange
-        if (categoryLower.includes('medium')) return 'rgb(59, 130, 246)'; // Blue
-        if (categoryLower.includes('low')) return 'rgb(34, 197, 94)'; // Green
-        // Fallback to a default color
-        return 'rgba(149, 70, 167, 1)'; // Default purple
+        if (categoryLower.includes('critical')) return 'rgb(220, 38, 38)';
+        if (categoryLower.includes('high')) return 'rgb(255, 140, 0)';
+        if (categoryLower.includes('medium')) return 'rgb(59, 130, 246)';
+        if (categoryLower.includes('low')) return 'rgb(34, 197, 94)';
+        return 'rgba(149, 70, 167, 1)';
     };
 
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
     const [filterMLCategory, setFilterMLCategory] = useState('Critical Risk');
     const [sortColumn, setSortColumn] = useState(null);
-    const [sortDirection, setSortDirection] = useState('asc'); // 'asc' or 'desc'
+    const [sortDirection, setSortDirection] = useState('asc');
     const [transactionData, setTransactionData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 15; // rows per page
+    const itemsPerPage = 15;
 
     useEffect(() => {
         const loadData = async () => {
@@ -986,7 +891,6 @@ const DataView = () => {
         loadData();
     }, []);
 
-    // Reset to page 1 when search or filter changes
     useEffect(() => {
         setCurrentPage(1);
     }, [searchTerm, filterStatus, filterMLCategory, sortColumn, sortDirection]);
@@ -1003,16 +907,13 @@ const DataView = () => {
 
     const handleSort = (column) => {
         if (sortColumn === column) {
-            // Toggle direction if same column
             setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
         } else {
-            // New column, start with ascending
             setSortColumn(column);
             setSortDirection('asc');
         }
     };
 
-    // Helper function to render sortable column header
     const SortableHeader = ({ column, label, minWidthClass = 'min-w-[120px]' }) => (
         <th 
             scope="col" 
@@ -1034,7 +935,6 @@ const DataView = () => {
         </th>
     );
 
-    // Helper function to handle null/undefined values
     const formatValue = (value) => {
         if (value === null || value === undefined || value === '') {
             return '-';
@@ -1042,7 +942,6 @@ const DataView = () => {
         return value;
     };
 
-    // Helper function to format dates (MM/DD/YYYY)
     const formatDate = (dateValue) => {
         if (dateValue === null || dateValue === undefined || dateValue === '' || dateValue === '-') {
             return '-';
@@ -1051,20 +950,17 @@ const DataView = () => {
         try {
             const date = new Date(dateValue);
             if (isNaN(date.getTime())) {
-                return '-'; // Return '-' if invalid date
+                return '-';
             }
-            
-            // Format as MM/DD/YYYY
             const month = String(date.getMonth() + 1).padStart(2, '0');
             const day = String(date.getDate()).padStart(2, '0');
             const year = date.getFullYear();
             return `${month}/${day}/${year}`;
         } catch (e) {
-            return '-'; // Return '-' if parsing fails
+            return '-';
         }
     };
 
-    // Helper function to format date with time (MM/DD/YYYY HH:MM AM/PM)
     const formatDateTime = (dateValue) => {
         if (dateValue === null || dateValue === undefined || dateValue === '' || dateValue === '-') {
             return '-';
@@ -1073,28 +969,22 @@ const DataView = () => {
         try {
             const date = new Date(dateValue);
             if (isNaN(date.getTime())) {
-                return '-'; // Return '-' if invalid date
+                return '-';
             }
-            
-            // Format as MM/DD/YYYY HH:MM AM/PM
             const month = String(date.getMonth() + 1).padStart(2, '0');
             const day = String(date.getDate()).padStart(2, '0');
             const year = date.getFullYear();
-            
-            // Convert to 12-hour format with AM/PM
             let hours = date.getHours();
             const minutes = String(date.getMinutes()).padStart(2, '0');
             const ampm = hours >= 12 ? 'PM' : 'AM';
             hours = hours % 12;
-            hours = hours ? hours : 12; // the hour '0' should be '12'
-            
+            hours = hours ? hours : 12;
             return `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
         } catch (e) {
-            return '-'; // Return '-' if parsing fails
+            return '-';
         }
     };
 
-    // Filter data
     let filteredData = transactionData.filter(row => {
         const id = row.id || '';
         const category = row.category || '';
@@ -1109,12 +999,10 @@ const DataView = () => {
         return matchesSearch && matchesStatusFilter && matchesMLCategoryFilter;
     });
 
-    // Sort data
     if (sortColumn) {
         filteredData = [...filteredData].sort((a, b) => {
             let aValue, bValue;
             
-            // Numeric columns
             const numericColumns = ['amount', 'ml_predicted_score', 'rule_based_score', 'distance_miles', 
                                    'travel_time_minutes', 'speed_mph', 'plan_rate'];
             if (numericColumns.includes(sortColumn)) {
@@ -1125,7 +1013,6 @@ const DataView = () => {
                 return sortDirection === 'asc' ? comparison : -comparison;
             }
             
-            // Date columns
             const dateColumns = ['transaction_date', 'posting_date', 'entry_time', 'exit_time', 
                                 'prediction_timestamp', 'last_updated'];
             if (dateColumns.includes(sortColumn)) {
@@ -1136,7 +1023,6 @@ const DataView = () => {
                 return sortDirection === 'asc' ? comparison : -comparison;
             }
             
-            // Boolean columns
             const booleanColumns = ['is_anomaly', 'route_instate', 'is_impossible_travel', 'is_rapid_succession',
                                    'flag_rush_hour', 'flag_is_weekend', 'flag_is_holiday', 'flag_overlapping_journey',
                                    'flag_driver_amount_outlier', 'flag_route_amount_outlier', 
@@ -1149,7 +1035,6 @@ const DataView = () => {
                 return sortDirection === 'asc' ? comparison : -comparison;
             }
             
-            // String columns (default)
             aValue = (a[sortColumn] || '').toString().toLowerCase();
             bValue = (b[sortColumn] || '').toString().toLowerCase();
             if (aValue === bValue) return 0;
@@ -1158,16 +1043,12 @@ const DataView = () => {
         });
     }
 
-    // Slice the filtered data for the current page
     const paginatedData = filteredData.slice(
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage
     );
 
-    // Total pages
     const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-
-
 
     if (loading) return <div>Loading transactions...</div>;
     return (
@@ -1500,7 +1381,6 @@ const DataView = () => {
                         {totalPages > 0 && (
                             <div className="flex space-x-1">
                                 {[...Array(Math.min(totalPages, 10))].map((_, idx) => {
-                                    // Show page numbers with ellipsis for large page counts
                                     let pageNum;
                                     if (totalPages <= 10) {
                                         pageNum = idx + 1;
@@ -1560,21 +1440,36 @@ const MoonIcon = () => (
     </svg>
 );
 
-// --- Main App Component ---
+// --- Main App Component with MSAL Login Gate ---
 
 export default function App() {
     const [activeView, setActiveView] = useState('dashboard');
     const [isDarkMode, setIsDarkMode] = useState(() => {
-        // Check localStorage first, then default to light mode
         const saved = localStorage.getItem('theme');
         if (saved) {
             return saved === 'dark';
         }
-        return false; // Default to light mode
+        return false;
     });
 
+    const { instance, accounts } = useMsal();
+    const isAuthenticated = useIsAuthenticated();
+
+    const handleLogin = () => {
+        instance.loginPopup(loginRequest).catch(err => {
+            console.error("MSAL login failed:", err);
+        });
+    };
+
+    const handleLogout = () => {
+        instance.logoutPopup().catch(err => {
+            console.error("MSAL logout failed:", err);
+        });
+    };
+
+    const userName = accounts[0]?.name || accounts[0]?.username;
+
     useEffect(() => {
-        // Apply theme class to document root
         if (isDarkMode) {
             document.documentElement.classList.add('dark');
             localStorage.setItem('theme', 'dark');
@@ -1588,6 +1483,136 @@ export default function App() {
         setIsDarkMode(!isDarkMode);
     };
 
+    // --- Unauthenticated Login Screen ---
+    if (!isAuthenticated) {
+        return (
+            <div className={`relative min-h-screen transition-colors duration-300 ${
+                isDarkMode 
+                    ? 'bg-black text-gray-200' 
+                    : 'bg-gray-50 text-gray-900'
+            }`} style={{ fontFamily: "'Inter', sans-serif" }}>
+                {/* Animated Background */}
+                <div className="fixed inset-0 overflow-hidden pointer-events-none">
+                    <div className={`absolute -top-1/2 -right-1/2 w-full h-full rounded-full blur-3xl animate-pulse ${
+                        isDarkMode 
+                            ? 'bg-gradient-to-br from-[#9546A7]/10 via-cyan-500/5 to-transparent' 
+                            : 'bg-gradient-to-br from-[#9546A7]/5 via-cyan-500/3 to-transparent'
+                    }`}></div>
+                    <div className={`absolute -bottom-1/2 -left-1/2 w-full h-full rounded-full blur-3xl animate-pulse ${
+                        isDarkMode 
+                            ? 'bg-gradient-to-tr from-blue-500/10 via-[#9546A7]/5 to-transparent' 
+                            : 'bg-gradient-to-tr from-blue-500/5 via-[#9546A7]/3 to-transparent'
+                    }`} style={{animationDelay: '1s'}}></div>
+                </div>
+
+                <div className="relative z-10 p-4 sm:p-6 lg:p-8">
+                    <div className="max-w-6xl mx-auto">
+                        {/* Top bar with theme toggle */}
+                        <div className="flex justify-end mb-6">
+                            <button
+                                onClick={toggleTheme}
+                                className="p-2.5 rounded-xl bg-white dark:bg-white/5 backdrop-blur-sm border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:text-[#9546A7] dark:hover:text-[#9546A7] hover:bg-gray-100 dark:hover:bg-white/10 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[#9546A7]/50 dark:shadow-[4px_4px_8px_rgba(0,0,0,0.2),-2px_-2px_4px_rgba(255,255,255,0.03)]"
+                                aria-label="Toggle theme"
+                            >
+                                {isDarkMode ? <SunIcon /> : <MoonIcon />}
+                            </button>
+                        </div>
+
+                        <div className="grid gap-10 lg:grid-cols-2 items-center">
+                            {/* Text / CTA */}
+                            <div className="space-y-6">
+                                <div className="inline-flex items-center space-x-3 px-3 py-1.5 rounded-full bg-white/70 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-xs font-semibold text-gray-700 dark:text-gray-300 backdrop-blur">
+                                    <span className="inline-flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                                    <span>Secure NJ Courts access</span>
+                                </div>
+                                <div>
+                                    <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:bg-gradient-to-r dark:from-white dark:via-gray-100 dark:to-gray-300 dark:bg-clip-text dark:text-transparent mb-2">
+                                        EZ Pass Fraud Detection Dashboard
+                                    </h1>
+                                    <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 max-w-xl">
+                                        Sign in with your NJ Courts Microsoft 365 account to review ML-powered fraud 
+                                        alerts, visualize toll anomalies, and triage suspicious EZ Pass activity.
+                                    </p>
+                                </div>
+
+                                <div className="space-y-3 text-sm text-gray-600 dark:text-gray-300">
+                                    <div className="flex items-start space-x-3">
+                                        <div className="mt-1 h-1.5 w-1.5 rounded-full bg-[#9546A7]" />
+                                        <p><span className="font-semibold">Centralized view</span> of rule-based and ML-detected anomalies.</p>
+                                    </div>
+                                    <div className="flex items-start space-x-3">
+                                        <div className="mt-1 h-1.5 w-1.5 rounded-full bg-blue-500" />
+                                        <p><span className="font-semibold">Filter and sort</span> by plate, route, risk level, and more.</p>
+                                    </div>
+                                    <div className="flex items-start space-x-3">
+                                        <div className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                        <p><span className="font-semibold">Track outcomes</span> with status updates on individual cases.</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-4">
+                                    <button
+                                        onClick={handleLogin}
+                                        className="inline-flex items-center justify-center px-5 py-3 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-[#9546A7] to-[#7A3A8F] shadow-lg shadow-[#9546A7]/30 hover:shadow-xl hover:from-[#7A3A8F] hover:to-[#9546A7] transition-all focus:outline-none focus:ring-2 focus:ring-[#9546A7]/60"
+                                    >
+                                        <span className="mr-2">Sign in with Microsoft</span>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                                        </svg>
+                                    </button>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        Access restricted to authorized NJ Courts staff.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Right card / preview */}
+                            <div className="hidden lg:block">
+                                <div className="relative">
+                                    <div className="absolute -inset-1 bg-gradient-to-tr from-[#9546A7]/40 via-indigo-500/40 to-cyan-500/40 blur-3xl opacity-60" />
+                                    <div className="relative bg-white dark:bg-slate-900/80 border border-gray-200 dark:border-white/10 rounded-2xl p-5 shadow-2xl backdrop-blur-lg">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="bg-gradient-to-br from-[#9546A7] to-[#7A3A8F] p-2 rounded-xl text-white">
+                                                    <ShieldIcon />
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400">Environment</p>
+                                                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Fraud Analytics</p>
+                                                </div>
+                                            </div>
+                                            <span className="px-3 py-1 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                                SECURE • SSO
+                                            </span>
+                                        </div>
+                                        <div className="space-y-3 text-xs text-gray-600 dark:text-gray-300">
+                                            <div className="flex items-center justify-between">
+                                                <span>Flagged Transactions (24h)</span>
+                                                <span className="font-mono text-emerald-400">89</span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span>Critical Risk</span>
+                                                <span className="font-mono text-red-400">12</span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span>ML Anomaly Coverage</span>
+                                                <span className="font-mono text-sky-400">97.3%</span>
+                                            </div>
+                                        </div>
+                                        <div className="mt-5 h-24 rounded-xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border border-slate-700 flex items-center justify-center text-xs text-gray-400">
+                                            Live dashboards unlock after sign-in.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // --- Authenticated Main App ---
     return (
         <div className={`relative min-h-screen transition-colors duration-300 ${
             isDarkMode 
@@ -1627,7 +1652,7 @@ export default function App() {
                                     </div>
                                 </div>
 
-                                {/* Navigation and Theme Toggle */}
+                                {/* Navigation / User / Theme */}
                                 <div className="flex items-center gap-4">
                                     {/* Navigation Toggle */}
                                     <div className="flex items-center p-1.5 rounded-xl bg-white dark:bg-white/5 backdrop-blur-sm border border-gray-200 dark:border-white/10 shadow-inner dark:shadow-[inset_4px_4px_8px_rgba(0,0,0,0.3),inset_-2px_-2px_4px_rgba(255,255,255,0.05)]">
@@ -1662,6 +1687,23 @@ export default function App() {
                                             Charts
                                         </button>
                                     </div>
+
+                                    {/* User info + Sign out */}
+                                    {userName && (
+                                        <div className="hidden sm:flex flex-col items-end">
+                                            <span className="text-xs text-gray-400 dark:text-gray-400">Signed in as</span>
+                                            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 max-w-[200px] truncate">
+                                                {userName}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    <button
+                                        onClick={handleLogout}
+                                        className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-[#9546A7] dark:hover:text-[#9546A7] transition-all focus:outline-none focus:ring-2 focus:ring-[#9546A7]/40"
+                                    >
+                                        Sign out
+                                    </button>
                                     
                                     {/* Theme Toggle */}
                                     <button

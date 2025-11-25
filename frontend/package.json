@@ -4,6 +4,8 @@
   "description": "E-ZPass Fraud Detection Dashboard for New Jersey Courts",
   "private": true,
   "dependencies": {
+    "@azure/msal-browser": "^4.26.2",
+    "@azure/msal-react": "^3.0.22",
     "chart.js": "^4.4.0",
     "plotly.js": "^2.35.3",
     "react": "^18.2.0",
