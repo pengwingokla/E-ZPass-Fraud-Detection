@@ -1455,17 +1455,19 @@ export default function App() {
     const { instance, accounts } = useMsal();
     const isAuthenticated = useIsAuthenticated();
 
-    const handleLogin = () => {
-        instance.loginPopup(loginRequest).catch(err => {
-            console.error("MSAL login failed:", err);
-        });
-    };
+   // --- MSAL Login / Logout Handlers (Redirect Version) ---
+const handleLogin = () => {
+    instance.loginRedirect(loginRequest).catch(err => {
+        console.error("MSAL login failed:", err);
+    });
+};
 
-    const handleLogout = () => {
-        instance.logoutPopup().catch(err => {
-            console.error("MSAL logout failed:", err);
-        });
-    };
+const handleLogout = () => {
+    instance.logoutRedirect().catch(err => {
+        console.error("MSAL logout failed:", err);
+    });
+};
+
 
     const userName = accounts[0]?.name || accounts[0]?.username;
 
@@ -1640,6 +1642,7 @@ export default function App() {
                         <div className="bg-white dark:bg-white/5 backdrop-blur-xl border border-gray-200 dark:border-white/10 rounded-2xl p-6 shadow-2xl dark:shadow-[12px_12px_24px_rgba(0,0,0,0.4),-6px_-6px_12px_rgba(255,255,255,0.08)]">
                             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
                                 {/* Logo and Title */}
+
                                 <div className="flex items-center space-x-4">
                                     <div className="bg-gradient-to-br from-[#9546A7] to-[#7A3A8F] p-3 rounded-2xl shadow-lg text-white">
                                         <ShieldIcon />
