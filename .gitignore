@@ -17,7 +17,7 @@ yarn-debug.log*
 yarn-error.log*
 yarn.lock
 
-# Python
+# Python cache files and compiled files
 __pycache__/
 *.py[cod]
 *$py.class
@@ -35,21 +35,87 @@ parts/
 sdist/
 var/
 wheels/
+pip-wheel-metadata/
+share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 MANIFEST
 *.pyc
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 .tox/
 .nox/
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Python environments
 .venv/
 venv/
 env/
 ENV/
+env.bak/
+venv.bak/
 *venv/
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# Keys and credentials
 *keys/
 # Environment variables
 .env
@@ -61,17 +127,28 @@ ENV/
 
 # IDE and editors
 .vscode/
+.vs/
 .idea/
 *.swp
 *.swo
 *~
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+*.iml
+*.iws
+*.ipr
+
+# VS Code settings (optional - you might want to commit some of these)
+.vscode/launch.json
+.vscode/tasks.json
+.vscode/settings.json
+
+# Emacs
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
 
 # Logs
 logs/
@@ -80,6 +157,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
+src/airflow/logs/scheduler/
 
 # Runtime data
 pids/
@@ -114,6 +192,9 @@ jspm_packages/
 
 # Optional eslint cache
 .eslintcache
+
+# Prettier cache
+.prettiercache
 
 # Microbundle cache
 .rpt2_cache/
@@ -152,6 +233,10 @@ public
 # Temporary folders
 tmp/
 temp/
+.tmp/
+.temp/
+*.tmp
+*.temp
 
 # Database files
 *.sqlite
@@ -166,12 +251,46 @@ Dockerfile
 docker-compose*.yml
 .dockerignore
 
-# Jupyter Notebook
-.ipynb_checkpoints
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+.AppleDouble
+.LSOverride
 
-# IPython
-profile_default/
-ipython_config.py
+# Windows
+# Linux
+# macOS (already covered above)
+
+# Documentation build
+docs/_build/
+site/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional stylelint cache
+.stylelintcache
+
+# Serverless directories
+.serverless/
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port
+
+# Local development
+.local/
 
 # Machine Learning Models
 *.pkl
@@ -181,13 +300,15 @@ ipython_config.py
 models/trained/
 models/checkpoints/
 
-# Data files (be careful with these)
+# Data files (keep structure but ignore content)
 *.csv
+*.CSV
 *.json
 *.xml
 *.xlsx
 *.xls
-data/raw/
+/data/raw/*
+!/data/raw/.gitkeep
 data/processed/
 data/external/
 
@@ -220,85 +341,6 @@ credentials.json
 *.backup
 *.old
 
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Windows
-*.tmp
-*.temp
-desktop.ini
-
-# Linux
-*~
-
-# macOS
-.AppleDouble
-.LSOverride
-
-# Documentation build
-docs/_build/
-site/
-
-# ESLint cache
-.eslintcache
-
-# Prettier cache
-.prettiercache
-
-# TypeScript cache
-*.tsbuildinfo
-
-# Optional stylelint cache
-.stylelintcache
-
-# Serverless directories
-.serverless/
-
-# FuseBox cache
-.fusebox/
-
-# DynamoDB Local files
-.dynamodb/
-
-# TernJS port file
-.tern-port
-
-# VS Code settings (optional - you might want to commit some of these)
-.vscode/launch.json
-.vscode/tasks.json
-.vscode/settings.json
-
-# JetBrains IDEs
-.idea/
-*.iml
-*.iws
-*.ipr
-
-# Vim
-*.swp
-*.swo
-*~
-
-# Emacs
-*~
-\#*\#
-/.emacs.desktop
-/.emacs.desktop.lock
-*.elc
-auto-save-list
-tramp
-.\#*
-
-# Local development
-.local/
-.cache/
-
 # Fraud Detection Specific
 # ML training outputs
 ml-analytics/models/
@@ -324,3 +366,21 @@ frontend/node_modules
 # Monitoring and analytics
 monitoring/
 analytics/logs/
+
+# Airflow specific
+airflow/plugins/__pycache__/
+airflow/dags/__pycache__/
+airflow/logs/
+
+# dbt specific
+ezpass_dbt/target/
+ezpass_dbt/logs/
+ezpass_dbt/dbt_packages/
+
+# GCP keys and service account credentials
+gcp-key.json
+*gcp-key*.json
+backend/config/gcp-key.json
+**/gcp-key.json
+*.json.key
+service-account*.json

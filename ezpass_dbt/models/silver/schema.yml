@@ -1,0 +1,100 @@
+version: 2
+
+models:
+  - name: silver
+    description: >
+      Clean, enriched toll transaction data with standardized formats and human-readable names.
+      This is the primary silver layer view combining cleaned data with agency and plaza lookups.
+    columns:
+      - name: transaction_date
+        description: Date when the transaction occurred
+        tests:
+          - not_null
+          
+      - name: posting_date
+        description: Date when the transaction was posted to the account
+        
+      - name: entry_time
+        description: Timestamp when the vehicle entered the toll facility
+        
+      - name: exit_time
+        description: Timestamp when the vehicle exited the toll facility
+        
+      - name: tag_plate_number
+        description: E-ZPass tag or license plate number (uppercased and cleaned)
+        tests:
+          - not_null
+          
+      - name: agency
+        description: Agency code (e.g., GSP, NJTP, SJ)
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['GSP', 'NJTP', 'SJ', 'PTC', 'DRJTBC', 'DRPA', 'PANYNJ', 'BCBC', 'NJ E-ZPASS', 'CBDTP', 'DELDOT', 'DRBA', 'ILTOLL', 'ITRCC', 'MASSDOT', 'MDTA', 'META', 'MTAB&T', 'NHDOT', 'NYSBA', 'NYSTA', 'OTIC', 'VDOT']
+              
+      - name: agency_name
+        description: Full agency name (e.g., Garden State Parkway)
+
+      - name: state_name
+        description: State name abbreviation (e.g., NJ, NY, PA, DE)
+        
+      - name: description
+        description: Transaction description
+        
+      - name: entry_plaza
+        description: Entry plaza code
+        
+      - name: entry_plaza_name
+        description: Full entry plaza name
+        
+      - name: entry_lane
+        description: Entry lane number
+        
+      - name: exit_plaza
+        description: Exit plaza code
+        
+      - name: exit_plaza_name
+        description: Full exit plaza name
+        
+      - name: exit_lane
+        description: Exit lane number
+        
+      - name: vehicle_type_code
+        description: Vehicle classification code
+        
+      - name: plan_rate
+        description: Toll plan or rate type
+        
+      - name: fare_type
+        description: Type of fare applied
+        
+      - name: amount
+        description: Transaction amount in dollars
+        tests:
+          - not_null
+          
+      - name: prepaid
+        description: Indicates if transaction was prepaid
+        
+      - name: balance
+        description: Account balance after transaction
+        
+      - name: loaded_at
+        description: Timestamp when record was loaded into the data warehouse
+        
+      - name: source_file
+        description: Name of the source file from which this record originated
+
+  - name: _silver__cleaning
+    description: >
+      Internal cleaning layer - parses dates, timestamps, and standardizes text fields.
+      This is an ephemeral model (not materialized).
+    config:
+      materialized: ephemeral
+    
+  - name: _silver__enrichment
+    description: >
+      Internal enrichment layer - adds human-readable names for agencies and plazas.
+      This is an ephemeral model (not materialized).
+    config:
+      materialized: ephemeral

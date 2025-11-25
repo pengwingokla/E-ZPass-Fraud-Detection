@@ -1,0 +1,252 @@
+version: 2
+
+models:
+  - name: master_viz
+    description: "Master visualization table combining ML predictions from pred_viz with complete transaction details from gold layer"
+    columns:
+      # CORE IDENTIFIERS
+      - name: transaction_id
+        description: "Unique transaction identifier"
+        tests:
+          - not_null
+          - unique
+          
+      - name: transaction_date
+        description: "Date of the transaction"
+        
+      - name: posting_date
+        description: "Date when transaction was posted to account"
+        
+      - name: tag_plate_number
+        description: "License plate or tag number"
+        
+      # ML PREDICTIONS & RISK
+      - name: is_anomaly
+        description: "Binary flag indicating if transaction is predicted as anomaly (1) or normal (0) by ML model"
+        
+      - name: ml_anomaly_score
+        description: "Anomaly score from Isolation Forest model. Lower (more negative) scores indicate higher anomaly likelihood"
+        
+      - name: prediction_timestamp
+        description: "Timestamp when the ML prediction was generated"
+        
+      - name: anomaly_category
+        description: "Risk category based on ML anomaly score percentiles: Critical Risk (<=p1), High Risk (<=p5), Medium Risk (<=p25), Low Risk (>p25)"
+        
+      - name: status
+        description: "Workflow status for fraud review process. Automatically set to 'Needs Review' for High Risk or Critical Risk transactions, 'No Action Required' for lower risk levels"
+        
+      - name: score_percentile_rank
+        description: "Percentile rank of the ML anomaly score (0-1), where lower values indicate more anomalous transactions"
+        
+      - name: score_p1_threshold
+        description: "1st percentile threshold for ML anomaly scores (Critical Risk cutoff)"
+        
+      - name: score_p5_threshold
+        description: "5th percentile threshold for ML anomaly scores (High Risk cutoff)"
+        
+      - name: score_p25_threshold
+        description: "25th percentile threshold for ML anomaly scores (Medium Risk cutoff)"
+        
+      # LOCATION INFO
+      - name: agency
+        description: "Toll agency code"
+        
+      - name: agency_name
+        description: "Toll agency full name"
+        
+      - name: state_name
+        description: "State where transaction occurred"
+        
+      - name: entry_plaza
+        description: "Entry plaza code"
+        
+      - name: entry_plaza_name
+        description: "Entry plaza name"
+        
+      - name: exit_plaza
+        description: "Exit plaza code"
+        
+      - name: exit_plaza_name
+        description: "Exit plaza name"
+        
+      - name: route_name
+        description: "Route identifier (entry-exit combination)"
+        
+      - name: route_instate
+        description: "Flag indicating if route is within state"
+        
+      # TIME INFO
+      - name: entry_time
+        description: "Entry timestamp"
+        
+      - name: exit_time
+        description: "Exit timestamp"
+        
+      - name: entry_hour
+        description: "Hour of day at entry (0-23)"
+        
+      - name: exit_hour
+        description: "Hour of day at exit (0-23)"
+        
+      - name: travel_time_of_day
+        description: "Time of day category (Morning/Afternoon/Evening/Night)"
+        
+      - name: flag_rush_hour
+        description: "Flag indicating if transaction occurred during rush hour"
+        
+      - name: flag_is_weekend
+        description: "Flag indicating if transaction occurred on weekend"
+        
+      - name: flag_is_holiday
+        description: "Flag indicating if transaction occurred on holiday"
+        
+      # VEHICLE & FARE
+      - name: vehicle_type_code
+        description: "Vehicle type code"
+        
+      - name: vehicle_type_name
+        description: "Vehicle type description"
+        
+      - name: flag_vehicle_type
+        description: "Flag for unusual vehicle type"
+        
+      - name: plan_rate
+        description: "Plan rate for the transaction"
+        
+      - name: fare_type
+        description: "Fare type classification"
+        
+      # FINANCIAL
+      - name: amount
+        description: "Transaction amount in dollars"
+        
+      # VELOCITY & TRAVEL
+      - name: distance_miles
+        description: "Distance between entry and exit plazas in miles"
+        
+      - name: travel_time_minutes
+        description: "Time taken to travel between entry and exit"
+        
+      - name: speed_mph
+        description: "Calculated average speed (distance / time)"
+        
+      - name: min_required_travel_time_minutes
+        description: "Minimum physically required travel time"
+        
+      - name: is_impossible_travel
+        description: "Flag indicating physically impossible travel speed"
+        
+      - name: is_rapid_succession
+        description: "Flag indicating unusually rapid consecutive transactions"
+        
+      - name: flag_overlapping_journey
+        description: "Flag indicating overlapping journeys for same tag"
+        
+      - name: overlapping_journey_duration_minutes
+        description: "Duration of overlapping journeys in minutes"
+        
+      - name: travel_time_category
+        description: "Categorization of travel time (Fast/Normal/Slow)"
+        
+      # DRIVER STATS
+      - name: driver_amount_last_30txn_avg
+        description: "Driver's average transaction amount over last 30 transactions"
+        
+      - name: driver_amount_last_30txn_std
+        description: "Standard deviation of driver's transaction amounts over last 30 transactions"
+        
+      - name: driver_amount_last_30txn_min
+        description: "Minimum transaction amount in driver's last 30 transactions"
+        
+      - name: driver_amount_last_30txn_max
+        description: "Maximum transaction amount in driver's last 30 transactions"
+        
+      - name: driver_amount_last_30txn_count
+        description: "Number of transactions in driver's last 30 transaction window"
+        
+      - name: driver_daily_txn_count
+        description: "Number of transactions by driver on the same day"
+        
+      - name: driver_amount_median
+        description: "Median transaction amount for the driver"
+        
+      - name: driver_amount_modified_z_score
+        description: "Modified z-score for transaction amount relative to driver's history"
+        
+      - name: amount_deviation_from_avg_pct
+        description: "Percentage deviation from driver's average transaction amount"
+        
+      - name: amount_deviation_from_median_pct
+        description: "Percentage deviation from driver's median transaction amount"
+        
+      - name: driver_today_spend
+        description: "Total amount spent by driver today"
+        
+      - name: driver_avg_daily_spend_30d
+        description: "Driver's average daily spending over last 30 days"
+        
+      # ROUTE STATS
+      - name: route_amount_avg
+        description: "Average transaction amount for this route"
+        
+      - name: route_amount_std
+        description: "Standard deviation of transaction amounts for this route"
+        
+      - name: route_amount_min
+        description: "Minimum transaction amount observed for this route"
+        
+      - name: route_amount_max
+        description: "Maximum transaction amount observed for this route"
+        
+      - name: route_amount_med
+        description: "Median transaction amount for this route"
+        
+      - name: route_transaction_count
+        description: "Total number of transactions on this route"
+        
+      - name: route_amount_z_score
+        description: "Z-score for transaction amount relative to route's typical amounts"
+        
+      # RULE-BASED ANOMALY FLAGS
+      - name: flag_driver_amount_outlier
+        description: "Rule-based flag for driver amount outlier"
+        
+      - name: flag_route_amount_outlier
+        description: "Rule-based flag for route amount outlier"
+        
+      - name: flag_amount_unusually_high
+        description: "Rule-based flag for unusually high amount"
+        
+      - name: flag_driver_spend_spike
+        description: "Rule-based flag for driver spending spike"
+        
+      - name: rule_based_anomaly_score
+        description: "Composite anomaly score from rule-based flags (from gold layer)"
+        
+      # ENCODED FEATURES
+      - name: route_name_freq_encoded
+        description: "Frequency encoding for route name (used in ML model)"
+        
+      - name: entry_plaza_freq_encoded
+        description: "Frequency encoding for entry plaza (used in ML model)"
+        
+      - name: exit_plaza_freq_encoded
+        description: "Frequency encoding for exit plaza (used in ML model)"
+        
+      - name: vehicle_type_freq_encoded
+        description: "Frequency encoding for vehicle type (used in ML model)"
+        
+      - name: agency_freq_encoded
+        description: "Frequency encoding for agency (used in ML model)"
+        
+      - name: travel_time_of_day_freq_encoded
+        description: "Frequency encoding for travel time of day (used in ML model)"
+        
+      # METADATA
+      - name: last_updated
+        description: "Timestamp when record was last updated"
+        
+      - name: source_file
+        description: "Source file from which transaction originated"
+

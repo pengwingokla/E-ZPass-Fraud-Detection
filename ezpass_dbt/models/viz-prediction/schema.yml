@@ -1,0 +1,102 @@
+version: 2
+
+models:
+  - name: pred_viz
+    description: "Prediction visualization model containing all fraud predictions with features"
+    columns:
+      - name: transaction_id
+        description: "Unique transaction identifier"
+        
+      - name: is_anomaly
+        description: "Binary flag indicating if transaction is predicted as anomaly (1) or normal (0)"
+        
+      - name: ml_anomaly_score
+        description: "Anomaly score from Isolation Forest model. Lower (more negative) scores indicate higher anomaly likelihood"
+        
+      - name: prediction_timestamp
+        description: "Timestamp when the prediction was generated"
+        
+      - name: anomaly_category
+        description: "Risk category based on anomaly score percentiles: Critical Risk (<=p1), High Risk (<=p5), Medium Risk (<=p25), Low Risk (>p25)"
+        
+      - name: score_percentile_rank
+        description: "Percentile rank of the anomaly score (0-1), where lower values indicate more anomalous transactions"
+        
+      - name: score_p1_threshold
+        description: "1st percentile threshold for anomaly scores (Critical Risk cutoff - most anomalous)"
+        
+      - name: score_p5_threshold
+        description: "5th percentile threshold for anomaly scores (High Risk cutoff)"
+        
+      - name: score_p25_threshold
+        description: "25th percentile threshold for anomaly scores (Medium Risk cutoff)"
+        
+      - name: amount
+        description: "Transaction amount in dollars"
+        
+      - name: distance_miles
+        description: "Distance between entry and exit plazas in miles"
+        
+      - name: travel_time_minutes
+        description: "Time taken to travel between entry and exit"
+        
+      - name: speed_mph
+        description: "Calculated average speed (distance / time)"
+        
+      - name: overlapping_journey_duration_minutes
+        description: "Duration of overlapping journeys for the same tag"
+        
+      - name: driver_amount_last_30txn_avg
+        description: "Driver's average transaction amount over last 30 transactions"
+        
+      - name: driver_amount_last_30txn_std
+        description: "Standard deviation of driver's transaction amounts over last 30 transactions"
+        
+      - name: driver_amount_last_30txn_count
+        description: "Number of transactions in driver's last 30 transaction window"
+        
+      - name: driver_daily_txn_count
+        description: "Number of transactions by driver on the same day"
+        
+      - name: driver_amount_modified_z_score
+        description: "Modified z-score for transaction amount relative to driver's history"
+        
+      - name: amount_deviation_from_avg_pct
+        description: "Percentage deviation from driver's average transaction amount"
+        
+      - name: amount_deviation_from_median_pct
+        description: "Percentage deviation from driver's median transaction amount"
+        
+      - name: driver_today_spend
+        description: "Total amount spent by driver today"
+        
+      - name: driver_avg_daily_spend_30d
+        description: "Driver's average daily spending over last 30 days"
+        
+      - name: route_amount_z_score
+        description: "Z-score for transaction amount relative to route's typical amounts"
+        
+      - name: exit_hour
+        description: "Hour of day when transaction exited (0-23)"
+        
+      - name: vehicle_type_code
+        description: "Vehicle type code"
+        
+      - name: route_name_freq_encoded
+        description: "Frequency encoding for route name"
+        
+      - name: entry_plaza_freq_encoded
+        description: "Frequency encoding for entry plaza"
+        
+      - name: exit_plaza_freq_encoded
+        description: "Frequency encoding for exit plaza"
+        
+      - name: vehicle_type_freq_encoded
+        description: "Frequency encoding for vehicle type"
+        
+      - name: agency_freq_encoded
+        description: "Frequency encoding for agency"
+        
+      - name: travel_time_of_day_freq_encoded
+        description: "Frequency encoding for travel time of day (Morning/Afternoon/Evening/Night)"
+

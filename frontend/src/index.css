@@ -11,7 +11,11 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #020617;
+  background: #f9fafb;
+}
+
+.dark body {
+  background: #000000;
 }
 
 code {
@@ -88,18 +92,26 @@ code {
 }
 
 ::-webkit-scrollbar-track {
-  background: #1e293b;
+  background: #f1f5f9;
   border-radius: 10px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.5);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #14b8a6, #0d9488);
+  background: linear-gradient(180deg, #9546A7, #7A3A8F);
   border-radius: 10px;
-  border: 2px solid #1e293b;
+  border: 2px solid #f1f5f9;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  border: 2px solid rgba(0, 0, 0, 0.5);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #2dd4bf, #14b8a6);
+  background: linear-gradient(180deg, #B873D1, #9546A7);
 }
 
 /* Glassmorphism effects */
