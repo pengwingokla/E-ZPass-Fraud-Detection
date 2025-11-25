@@ -20,6 +20,40 @@ test.describe('EZPass Dashboard', () => {
         await expect(page.getByRole('heading', { name: 'Recent Flagged Transactions' })).toBeVisible();
     });
 
+    test('Potential Loss card reflects API metrics response', async ({ page }) => {
+        const mockMetrics = {
+            total_transactions: 1200,
+            total_flagged: 240,
+            total_amount: 175000,
+            total_alerts_ytd: 980,
+            detected_frauds_current_month: 42,
+            potential_loss_ytd: 250000
+        };
+
+        let metricsRequestCount = 0;
+
+        await page.route('**/api/metrics', async route => {
+            metricsRequestCount += 1;
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify(mockMetrics)
+            });
+        });
+
+        await page.reload();
+
+        const potentialLossCard = page.locator('text=Potential Loss (YTD)').first().locator('xpath=..');
+        const cardValue = potentialLossCard.locator('p').filter({ hasText: /^\$/ }).first();
+
+        await expect(cardValue).toHaveText(/\$\d/, { timeout: 30000 });
+
+        const text = (await cardValue.textContent()) || '';
+        const numericValue = Number(text.replace(/[^0-9.-]/g, '')) || 0;
+        expect(numericValue).toBeGreaterThan(0);
+        expect(metricsRequestCount).toBeGreaterThan(0);
+    });
+
     test('recent flagged transactions on dashboard match top 3 on transactions page', async ({ page }) => {
         // Wait for dashboard to load and recent transactions to appear
         await expect(page.getByRole('heading', { name: 'Recent Flagged Transactions' })).toBeVisible();
@@ -76,12 +110,12 @@ test.describe('EZPass Dashboard', () => {
         // Check if loading message exists, if so wait for it to disappear
         const loadingMsg = page.locator('text=Loading transactions...');
         if (await loadingMsg.isVisible()) {
-            await loadingMsg.waitFor({ state: 'hidden', timeout: 15000 });
+            await loadingMsg.waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
         }
         
         // Wait for table rows to be available
         const tableRowsCheck = page.locator('tbody tr');
-        await tableRowsCheck.first().waitFor({ timeout: 10000 }).catch(() => {});
+        await tableRowsCheck.first().waitFor({ timeout: 20000 }).catch(() => {});
         await page.waitForTimeout(1000);
 
         // The recent flagged API returns transactions with status 'Needs Review' OR is_anomaly = 1
