@@ -54,6 +54,54 @@ test.describe('EZPass Dashboard', () => {
         expect(metricsRequestCount).toBeGreaterThan(0);
     });
 
+    test('Threat Severity card fetches and displays data from API', async ({ page }) => {
+        const mockSeverityData = {
+            data: [
+                { severity: 'Critical Risk', count: 15 },
+                { severity: 'High Risk', count: 42 },
+                { severity: 'Medium Risk', count: 128 },
+                { severity: 'Low Risk', count: 350 },
+                { severity: 'No Risk', count: 1200 }
+            ]
+        };
+
+        let severityRequestCount = 0;
+
+        await page.route('**/api/charts/severity', async route => {
+            severityRequestCount += 1;
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify(mockSeverityData)
+            });
+        });
+
+        await page.reload();
+
+        // Verify the Threat Severity card is visible
+        const threatSeverityHeading = page.getByRole('heading', { name: 'Threat Severity' });
+        await expect(threatSeverityHeading).toBeVisible({ timeout: 10000 });
+
+        // Wait for loading to complete (loading message should disappear)
+        const loadingMessage = page.locator('text=Loading chart data...');
+        if (await loadingMessage.isVisible().catch(() => false)) {
+            await loadingMessage.waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
+        }
+
+        // Wait for chart canvas to be rendered
+        // The canvas should be within the Threat Severity card section
+        const threatSeveritySection = threatSeverityHeading.locator('xpath=ancestor::div[contains(@class, "bg-white") or contains(@class, "dark:bg-white")]');
+        const chartCanvas = threatSeveritySection.locator('canvas');
+        await expect(chartCanvas).toBeVisible({ timeout: 30000 });
+
+        // Verify API was called
+        expect(severityRequestCount).toBeGreaterThan(0);
+
+        // Verify the chart is rendered (canvas should be visible)
+        const canvasCount = await chartCanvas.count();
+        expect(canvasCount).toBeGreaterThan(0);
+    });
+
     test('recent flagged transactions on dashboard match top 3 on transactions page', async ({ page }) => {
         // Wait for dashboard to load and recent transactions to appear
         await expect(page.getByRole('heading', { name: 'Recent Flagged Transactions' })).toBeVisible();

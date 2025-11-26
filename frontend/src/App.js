@@ -44,6 +44,18 @@ const fetchCategoryChartData = async () => {
     }
 };
 
+const fetchSeverityChartData = async () => {
+    try {
+        const response = await fetch(`${apiUrl}/api/charts/severity`);
+        if (!response.ok) throw new Error('Failed to fetch severity chart data');
+        const { data } = await response.json();
+        return data || [];
+    } catch (err) {
+        console.error(err);
+        return [];
+    }
+};
+
 const fetchRecentFlaggedTransactions = async () => {
     try {
         const response = await fetch(`${apiUrl}/api/transactions/recent-flagged`);
@@ -526,8 +538,14 @@ const CategoryChart = () => {
     return <div className="h-80 w-full flex justify-center items-center"><canvas ref={chartRef}></canvas></div>;
 };
 
+// Define order for severity levels (highest to lowest)
+const severityOrder = ['Critical Risk', 'High Risk', 'Medium Risk', 'Low Risk', 'No Risk'];
+
 const SeverityChart = () => {
     const chartRef = useRef(null);
+    const chartInstanceRef = useRef(null);
+    const [chartData, setChartData] = useState(null);
+    const [loading, setLoading] = useState(true);
     const [isDarkMode, setIsDarkMode] = useState(document.documentElement.classList.contains('dark'));
 
     useEffect(() => {
@@ -540,23 +558,97 @@ const SeverityChart = () => {
         return () => observer.disconnect();
     }, []);
 
-    useEffect(() => {
-        if (!chartRef.current) return;
+    // Map backend severity categories to display labels
+    const mapSeverityLabel = (severity) => {
+        const labelMap = {
+            'Critical Risk': 'Critical',
+            'High Risk': 'High',
+            'Medium Risk': 'Medium',
+            'Low Risk': 'Low',
+            'No Risk': 'No Risk'
+        };
+        return labelMap[severity] || severity;
+    };
 
+    // Get color for severity level
+    const getSeverityColor = (severity) => {
+        const colorMap = {
+            'Critical Risk': 'rgba(220, 38, 38, 0.8)',      // #DC2626 Red - Urgent
+            'High Risk': 'rgba(220, 38, 38, 0.8)',          // #DC2626 Red - Same as Critical
+            'Medium Risk': 'rgba(249, 115, 22, 0.8)',       // #F97316 Orange - Warning
+            'Low Risk': 'rgba(251, 191, 36, 0.8)',          // #FBBF24 Yellow/Amber - Caution
+            'No Risk': 'rgba(16, 185, 129, 0.8)'           // #10B981 Green - Safe
+        };
+        return colorMap[severity] || 'rgba(156, 163, 175, 0.8)'; // Gray fallback
+    };
+
+    useEffect(() => {
+        const loadChartData = async () => {
+            setLoading(true);
+            try {
+                const data = await fetchSeverityChartData();
+                if (data && data.length > 0) {
+                    // Sort by severity order (highest to lowest)
+                    const sortedData = [...data].sort((a, b) => {
+                        const indexA = severityOrder.indexOf(a.severity);
+                        const indexB = severityOrder.indexOf(b.severity);
+                        // If not found in order, put at end
+                        if (indexA === -1) return 1;
+                        if (indexB === -1) return -1;
+                        return indexA - indexB;
+                    });
+
+                    const labels = sortedData.map(item => mapSeverityLabel(item.severity));
+                    const counts = sortedData.map(item => item.count);
+                    const colors = sortedData.map(item => getSeverityColor(item.severity));
+                    
+                    setChartData({
+                        labels,
+                        counts,
+                        colors
+                    });
+                } else {
+                    setChartData({
+                        labels: [],
+                        counts: [],
+                        colors: []
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading severity chart data:', error);
+                setChartData({
+                    labels: [],
+                    counts: [],
+                    colors: []
+                });
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadChartData();
+    }, []);
+
+    useEffect(() => {
+        if (!chartRef.current || !chartData || loading) return;
+
+        // Destroy existing chart if it exists
         Chart.getChart(chartRef.current)?.destroy();
+        chartInstanceRef.current = null;
+
+        // Don't render chart if no data
+        if (chartData.labels.length === 0) {
+            return;
+        }
 
         const chart = new Chart(chartRef.current, {
             type: 'doughnut',
             data: {
-                labels: ['High', 'Medium', 'Low'],
+                labels: chartData.labels,
                 datasets: [{
                     label: ' Severity',
-                    data: [25, 35, 40],
-                    backgroundColor: [
-                        'rgba(239, 68, 68, 0.8)',
-                        'rgba(251, 146, 60, 0.8)',
-                        'rgba(34, 197, 94, 0.8)'
-                    ],
+                    data: chartData.counts,
+                    backgroundColor: chartData.colors,
                     borderColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)',
                     borderWidth: 3,
                     hoverOffset: 20,
@@ -591,7 +683,7 @@ const SeverityChart = () => {
                                 let label = context.label || '';
                                 let value = context.parsed || 0;
                                 let total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                let percentage = ((value / total) * 100).toFixed(1);
+                                let percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
                                 return `${label}: ${value} (${percentage}%)`;
                             }
                         }
@@ -599,8 +691,33 @@ const SeverityChart = () => {
                 }
             }
         });
-        return () => chart.destroy();
-    }, [isDarkMode]);
+
+        chartInstanceRef.current = chart;
+
+        return () => {
+            if (chartInstanceRef.current) {
+                chartInstanceRef.current.destroy();
+                chartInstanceRef.current = null;
+            }
+        };
+    }, [chartData, loading, isDarkMode]);
+
+    if (loading) {
+        return (
+            <div className="h-80 w-full flex justify-center items-center">
+                <div className="text-gray-400 dark:text-gray-400 text-gray-600">Loading chart data...</div>
+            </div>
+        );
+    }
+
+    if (!chartData || chartData.labels.length === 0) {
+        return (
+            <div className="h-80 w-full flex justify-center items-center">
+                <div className="text-gray-400 dark:text-gray-400 text-gray-600">No severity data available</div>
+            </div>
+        );
+    }
+
     return <div className="h-80 w-full flex justify-center items-center"><canvas ref={chartRef}></canvas></div>;
 };
 
