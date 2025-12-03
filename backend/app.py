@@ -40,12 +40,18 @@ except Exception as e:
 app = Flask(__name__)
 CORS(app)
 
+TABLE_NAME = os.getenv("BIGQUERY_TABLE", "master_viz")
+
+def get_table():
+    return f"`njc-ezpass.ezpass_data.{TABLE_NAME}`"
+
+
 #Get all transactions
 @app.route("/api/transactions")
 def all_transactions():
-    query = """
+    query = f"""
     SELECT * 
-    FROM `njc-ezpass.ezpass_data.master_viz`
+    FROM {get_table()}
     ORDER BY transaction_date DESC
     """
     results = client.query(query).result()
@@ -55,88 +61,158 @@ def all_transactions():
 #Get flagged or investigating transactions (Recent Alerts)
 @app.route("/api/transactions/alerts")
 def alerts():
-    query = """
-    SELECT * 
-    FROM `njc-ezpass.ezpass_data.master_viz` 
-    WHERE is_anomaly = 1
-    ORDER BY transaction_date DESC
-    LIMIT 100
-    """
-    results = client.query(query).result()
-    rows = [dict(row) for row in results]
-    return jsonify({"data": rows})
+    try:
+        if TABLE_NAME == "master_viz":
+            query = f"""
+                SELECT * 
+                FROM {get_table()} 
+                WHERE is_anomaly = 1
+                ORDER BY transaction_date DESC
+                LIMIT 100
+            """
+        elif TABLE_NAME == "gold_automation":
+            query = f"""
+                SELECT * 
+                FROM {get_table()} 
+                WHERE flag_fraud = TRUE
+                ORDER BY transaction_date DESC
+                LIMIT 100
+            """
+        else:
+            return jsonify({"error": "Unsupported table"}), 400
+
+        results = client.query(query).result()
+        rows = [dict(row) for row in results]
+        return jsonify({"data": rows})
+
+    except Exception as e:
+        print(f"Error fetching alerts: {str(e)}")
+        return jsonify({"data": [], "error": str(e)}), 500
+
 
 #Get recent flagged transactions for homepage card
 @app.route("/api/transactions/recent-flagged")
 def recent_flagged():
-    query = """
-    SELECT 
-        transaction_id,
-        transaction_date,
-        tag_plate_number,
-        agency,
-        amount,
-        status,
-        ml_predicted_category,
-        is_anomaly
-    FROM `njc-ezpass.ezpass_data.master_viz` 
-    WHERE (status = 'Needs Review' OR is_anomaly = 1)
-    ORDER BY transaction_date DESC
-    LIMIT 3
-    """
     try:
+        if TABLE_NAME == "master_viz":
+            query = f"""
+                SELECT 
+                    transaction_id,
+                    transaction_date,
+                    tag_plate_number,
+                    agency,
+                    amount,
+                    status,
+                    ml_predicted_category,
+                    is_anomaly
+                FROM {get_table()} 
+                WHERE (status = 'Needs Review' OR is_anomaly = 1)
+                ORDER BY transaction_date DESC
+                LIMIT 3
+            """
+        elif TABLE_NAME == "gold_automation":
+            query = f"""
+                SELECT 
+                    transaction_id,
+                    transaction_date,
+                    tag_plate_number,
+                    agency,
+                    amount,
+                    status,
+                    threat_severity,
+                    flag_fraud
+                FROM {get_table()} 
+                WHERE (status = 'Needs Review' OR flag_fraud = TRUE)
+                ORDER BY transaction_date DESC
+                LIMIT 3
+            """
+        else:
+            return jsonify({"error": "Unsupported table"}), 400
+
         results = client.query(query).result()
         rows = []
+
         for row in results:
-            # Use actual status from database
             status = row.get('status')
-            
-            # Map ml_predicted_category to category, with fallback
-            category = row.get('ml_predicted_category') or 'Anomaly Detected'
-            
+
+            # Map category column depending on table
+            category = row.get('ml_predicted_category') if TABLE_NAME == "master_viz" else row.get('threat_severity')
+            if not category:
+                category = 'Anomaly Detected'
+
             rows.append({
                 'id': row.get('transaction_id'),
                 'transaction_id': row.get('transaction_id'),
                 'transaction_date': str(row.get('transaction_date')) if row.get('transaction_date') else None,
                 'tag_plate_number': row.get('tag_plate_number'),
-                'tagPlate': row.get('tag_plate_number'),  # Also include tagPlate for compatibility
+                'tagPlate': row.get('tag_plate_number'),
                 'agency': row.get('agency'),
                 'amount': float(row.get('amount')) if row.get('amount') is not None else 0.0,
                 'status': status,
                 'category': category,
-                'is_anomaly': bool(row.get('is_anomaly'))
+                'is_anomaly': bool(row.get('is_anomaly') if TABLE_NAME == "master_viz" else row.get('flag_fraud'))
             })
+
         return jsonify({"data": rows})
+
     except Exception as e:
         print(f"Error fetching recent flagged transactions: {str(e)}")
         return jsonify({"data": [], "error": str(e)}), 500
 
+
 #Aggregated metrics for dashboard cards
 @app.route("/api/metrics")
 def metrics():
-    query = """
-    SELECT
-        COUNT(*) AS total_transactions,
-        SUM(CASE WHEN is_anomaly = 1 THEN 1 ELSE 0 END) AS total_flagged,
-        SUM(CASE WHEN is_anomaly = 1 THEN amount ELSE 0 END) AS total_amount,
-        SUM(CASE 
-                WHEN is_anomaly = 1 
-                     AND EXTRACT(YEAR FROM transaction_date) = EXTRACT(YEAR FROM CURRENT_DATE())
-                THEN amount 
-                ELSE 0 
-            END) AS potential_loss_ytd,
-        SUM(CASE WHEN is_anomaly = 1 
-                 AND EXTRACT(YEAR FROM transaction_date) = EXTRACT(YEAR FROM CURRENT_DATE()) THEN 1 ELSE 0 END) AS total_alerts_ytd,
-        SUM(CASE 
-                WHEN ml_predicted_category IN ('Critical Risk', 'High Risk')
-                     AND EXTRACT(YEAR FROM transaction_date) = EXTRACT(YEAR FROM CURRENT_DATE())
-                     AND EXTRACT(MONTH FROM transaction_date) = EXTRACT(MONTH FROM CURRENT_DATE())
-                THEN 1 
-                ELSE 0 
-            END) AS detected_frauds_current_month
-    FROM `njc-ezpass.ezpass_data.master_viz`
-    """
     try:
+        if TABLE_NAME == "master_viz":
+            query = f"""
+                SELECT
+                    COUNT(*) AS total_transactions,
+                    SUM(CASE WHEN is_anomaly = 1 THEN 1 ELSE 0 END) AS total_flagged,
+                    SUM(CASE WHEN is_anomaly = 1 THEN amount ELSE 0 END) AS total_amount,
+                    SUM(CASE 
+                            WHEN is_anomaly = 1 
+                                 AND EXTRACT(YEAR FROM transaction_date) = EXTRACT(YEAR FROM CURRENT_DATE())
+                            THEN amount 
+                            ELSE 0 
+                        END) AS potential_loss_ytd,
+                    SUM(CASE WHEN is_anomaly = 1 
+                             AND EXTRACT(YEAR FROM transaction_date) = EXTRACT(YEAR FROM CURRENT_DATE()) THEN 1 ELSE 0 END) AS total_alerts_ytd,
+                    SUM(CASE 
+                            WHEN ml_predicted_category IN ('Critical Risk', 'High Risk')
+                                 AND EXTRACT(YEAR FROM transaction_date) = EXTRACT(YEAR FROM CURRENT_DATE())
+                                 AND EXTRACT(MONTH FROM transaction_date) = EXTRACT(MONTH FROM CURRENT_DATE())
+                            THEN 1 
+                            ELSE 0 
+                        END) AS detected_frauds_current_month
+                FROM {get_table()}
+            """
+        elif TABLE_NAME == "gold_automation":
+            query = f"""
+                SELECT
+                    COUNT(*) AS total_transactions,
+                    SUM(CASE WHEN flag_fraud = TRUE THEN 1 ELSE 0 END) AS total_flagged,
+                    SUM(CASE WHEN flag_fraud = TRUE THEN amount ELSE 0 END) AS total_amount,
+                    SUM(CASE 
+                            WHEN flag_fraud = TRUE 
+                                 AND EXTRACT(YEAR FROM transaction_date) = EXTRACT(YEAR FROM CURRENT_DATE())
+                            THEN amount 
+                            ELSE 0 
+                        END) AS potential_loss_ytd,
+                    SUM(CASE WHEN flag_fraud = TRUE 
+                             AND EXTRACT(YEAR FROM transaction_date) = EXTRACT(YEAR FROM CURRENT_DATE()) THEN 1 ELSE 0 END) AS total_alerts_ytd,
+                    SUM(CASE 
+                            WHEN threat_severity IN ('Critical Risk', 'High Risk')
+                                 AND EXTRACT(YEAR FROM transaction_date) = EXTRACT(YEAR FROM CURRENT_DATE())
+                                 AND EXTRACT(MONTH FROM transaction_date) = EXTRACT(MONTH FROM CURRENT_DATE())
+                            THEN 1 
+                            ELSE 0 
+                        END) AS detected_frauds_current_month
+                FROM {get_table()}
+            """
+        else:
+            return jsonify({"error": "Unsupported table"}), 400
+
         results = client.query(query).result()
         metrics = dict(next(results))
         return jsonify({
@@ -147,6 +223,7 @@ def metrics():
             "detected_frauds_current_month": int(metrics.get("detected_frauds_current_month", 0)),
             "potential_loss_ytd": float(metrics.get("potential_loss_ytd", 0))
         })
+
     except Exception as e:
         print(f"Error fetching metrics: {str(e)}")
         return jsonify({
@@ -158,33 +235,65 @@ def metrics():
             "potential_loss_ytd": 0
         }), 500
 
+
 #Fraud by Category for chart
 @app.route("/api/charts/category")
 def category_chart():
-    query = """
-        WITH unpivoted AS (
-            SELECT
-                f.flag_label AS category
-            FROM `njc-ezpass.ezpass_data.master_viz`,
-            UNNEST([
-                STRUCT('Rush Hour' AS flag_label, flag_rush_hour AS flag_value),
-                STRUCT('Weekend' AS flag_label, flag_is_weekend AS flag_value),
-                STRUCT('Holiday' AS flag_label, flag_is_holiday AS flag_value),
-                STRUCT('Overlapping Journey' AS flag_label, flag_overlapping_journey AS flag_value),
-                STRUCT('Driver Amount Outlier' AS flag_label, flag_driver_amount_outlier AS flag_value),
-                STRUCT('Route Amount Outlier' AS flag_label, flag_route_amount_outlier AS flag_value),
-                STRUCT('Amount Unusually High' AS flag_label, flag_amount_unusually_high AS flag_value),
-                STRUCT('Driver Spend Spike' AS flag_label, flag_driver_spend_spike AS flag_value)
-            ]) AS f
-            WHERE is_anomaly = 1
-                AND f.flag_value IS TRUE
+
+    # MASTER_VIZ VERSION (your original logic)
+    if TABLE_NAME == "master_viz":
+        query = f"""
+            WITH unpivoted AS (
+                SELECT
+                    f.flag_label AS category
+                FROM {get_table()},
+                UNNEST([
+                    STRUCT('Rush Hour' AS flag_label, flag_rush_hour AS flag_value),
+                    STRUCT('Weekend' AS flag_label, flag_is_weekend AS flag_value),
+                    STRUCT('Holiday' AS flag_label, flag_is_holiday AS flag_value),
+                    STRUCT('Overlapping Journey' AS flag_label, flag_overlapping_journey AS flag_value),
+                    STRUCT('Driver Amount Outlier' AS flag_label, flag_driver_amount_outlier AS flag_value),
+                    STRUCT('Route Amount Outlier' AS flag_label, flag_route_amount_outlier AS flag_value),
+                    STRUCT('Amount Unusually High' AS flag_label, flag_amount_unusually_high AS flag_value),
+                    STRUCT('Driver Spend Spike' AS flag_label, flag_driver_spend_spike AS flag_value)
+                ]) AS f
+                WHERE is_anomaly = 1
+                    AND f.flag_value IS TRUE
             )
             SELECT category, COUNT(*) AS count
             FROM unpivoted
             GROUP BY category
-            ORDER BY count DESC;
+            ORDER BY count DESC
+        """
 
-    """
+    # GOLD_AUTOMATION VERSION (based on your columns)
+    elif TABLE_NAME == "gold_automation":
+        # Filter by flag_fraud first, then show the contributing flags (excluding flag_fraud itself)
+        query = f"""
+            WITH unpivoted AS (
+                SELECT
+                    f.flag_label AS category
+                FROM {get_table()},
+                UNNEST([
+                    STRUCT('Vehicle Type' AS flag_label, flag_vehicle_type AS flag_value),
+                    STRUCT('Amount > 29' AS flag_label, flag_amount_gt_29 AS flag_value),
+                    STRUCT('Out of State' AS flag_label, flag_is_out_of_state AS flag_value),
+                    STRUCT('Weekend' AS flag_label, flag_is_weekend AS flag_value),
+                    STRUCT('Holiday' AS flag_label, flag_is_holiday AS flag_value)
+                ]) AS f
+                WHERE flag_fraud = TRUE
+                    AND f.flag_value IS TRUE
+            )
+            SELECT category, COUNT(*) AS count
+            FROM unpivoted
+            GROUP BY category
+            ORDER BY count DESC
+        """
+
+    else:
+        return jsonify({"error": "Unsupported table"}), 400
+
+    # Run the query
     try:
         results = client.query(query).result()
         data = [{"category": row["category"], "count": row["count"]} for row in results]
@@ -194,43 +303,92 @@ def category_chart():
         return jsonify({"error": str(e), "data": []}), 500
 
 
+
 #Threat Severity for chart
 @app.route("/api/charts/severity")
 def severity_chart():
-    query = """
-    SELECT ml_predicted_category AS severity, COUNT(*) AS count
-    FROM `njc-ezpass.ezpass_data.master_viz`
-    WHERE ml_predicted_category IS NOT NULL
-    GROUP BY ml_predicted_category
-    """
-    results = client.query(query).result()
 
-    data = [
-        {"severity": row["severity"], "count": row["count"]}
-        for row in results
-    ]
+    # MASTER_VIZ version (original behavior)
+    if TABLE_NAME == "master_viz":
+        query = f"""
+            SELECT 
+                ml_predicted_category AS severity,
+                COUNT(*) AS count
+            FROM {get_table()}
+            WHERE ml_predicted_category IS NOT NULL
+            GROUP BY ml_predicted_category
+            ORDER BY count DESC
+        """
 
-    return jsonify({"data": data})
+    # GOLD_AUTOMATION version (uses threat_severity instead)
+    elif TABLE_NAME == "gold_automation":
+        query = f"""
+            SELECT 
+                threat_severity AS severity,
+                COUNT(*) AS count
+            FROM {get_table()}
+            WHERE threat_severity IS NOT NULL
+            GROUP BY threat_severity
+            ORDER BY count DESC
+        """
+
+    else:
+        return jsonify({"error": "Unsupported table"}), 400
+
+    # Run query
+    try:
+        results = client.query(query).result()
+        data = [{"severity": row["severity"], "count": row["count"]} for row in results]
+        return jsonify({"data": data})
+    except Exception as e:
+        print("BACKEND ERROR:", e)
+        return jsonify({"error": str(e), "data": []}), 500
+
 
 
 #Monthly transaction analysis for bar chart
 @app.route("/api/charts/monthly")
 def monthly_chart():
     try:
-        query = """
-        SELECT 
-            FORMAT_DATE('%b %Y', DATE(transaction_date)) AS month,
-            EXTRACT(YEAR FROM DATE(transaction_date)) AS year,
-            EXTRACT(MONTH FROM DATE(transaction_date)) AS month_num,
-            COUNT(*) AS total_transactions,
-            SUM(CASE WHEN is_anomaly = 1 THEN 1 ELSE 0 END) AS fraud_alerts
-        FROM `njc-ezpass.ezpass_data.master_viz`
-        WHERE transaction_date IS NOT NULL
-        GROUP BY year, month_num, month
-        ORDER BY year DESC, month_num DESC
-        LIMIT 12
-        """
+
+        # MASTER_VIZ logic
+        if TABLE_NAME == "master_viz":
+            query = f"""
+                SELECT 
+                    FORMAT_DATE('%b %Y', DATE(transaction_date)) AS month,
+                    EXTRACT(YEAR FROM DATE(transaction_date)) AS year,
+                    EXTRACT(MONTH FROM DATE(transaction_date)) AS month_num,
+                    COUNT(*) AS total_transactions,
+                    SUM(CASE WHEN is_anomaly = 1 THEN 1 ELSE 0 END) AS fraud_alerts
+                FROM {get_table()}
+                WHERE transaction_date IS NOT NULL
+                GROUP BY year, month_num, month
+                ORDER BY year DESC, month_num DESC
+                LIMIT 12
+            """
+
+        # GOLD_AUTOMATION logic
+        elif TABLE_NAME == "gold_automation":
+            query = f"""
+                SELECT 
+                    FORMAT_DATE('%b %Y', DATE(transaction_date)) AS month,
+                    EXTRACT(YEAR FROM DATE(transaction_date)) AS year,
+                    EXTRACT(MONTH FROM DATE(transaction_date)) AS month_num,
+                    COUNT(*) AS total_transactions,
+                    SUM(CASE WHEN flag_fraud = TRUE THEN 1 ELSE 0 END) AS fraud_alerts
+                FROM {get_table()}
+                WHERE transaction_date IS NOT NULL
+                GROUP BY year, month_num, month
+                ORDER BY year DESC, month_num DESC
+                LIMIT 12
+            """
+
+        else:
+            return jsonify({"error": "Unsupported table"}), 400
+
+        # Execute query
         results = client.query(query).result()
+        
         data = [{
             "month": row["month"],
             "year": int(row["year"]),
@@ -238,9 +396,12 @@ def monthly_chart():
             "total_transactions": int(row["total_transactions"]),
             "fraud_alerts": int(row["fraud_alerts"] or 0)
         } for row in results]
-        # Reverse to show oldest to newest (or keep newest first)
+
+        # Reverse to show oldest first if desired
         data.reverse()
+
         return jsonify({"data": data})
+
     except Exception as e:
         print(f"Error fetching monthly chart data: {str(e)}")
         return jsonify({"data": [], "error": str(e)}), 500
@@ -249,47 +410,90 @@ def monthly_chart():
 @app.route("/api/charts/scatter")
 def scatter_chart():
     try:
-        query = """
-        SELECT 
-            amount,
-            ml_predicted_score AS ml_anomaly_score,
-            ml_predicted_category AS risk_level
-        FROM `njc-ezpass.ezpass_data.master_viz`
-        WHERE DATE(transaction_date) >= '2024-01-01'
-            AND amount IS NOT NULL
-            AND ml_predicted_score IS NOT NULL
-            AND ml_predicted_category IS NOT NULL
-        """
+
+        if TABLE_NAME == "master_viz":
+            query = f"""
+                SELECT 
+                    amount,
+                    ml_predicted_score AS ml_anomaly_score,
+                    ml_predicted_category AS risk_level
+                FROM {get_table()}
+                WHERE DATE(transaction_date) >= '2024-01-01'
+                    AND amount IS NOT NULL
+                    AND ml_predicted_score IS NOT NULL
+                    AND ml_predicted_category IS NOT NULL
+            """
+
+        elif TABLE_NAME == "gold_automation":
+            query = f"""
+                SELECT 
+                    amount,
+                    rule_based_score AS ml_anomaly_score,
+                    threat_severity AS risk_level
+                FROM {get_table()}
+                WHERE DATE(transaction_date) >= '2024-01-01'
+                    AND amount IS NOT NULL
+                    AND rule_based_score IS NOT NULL
+                    AND threat_severity IS NOT NULL
+            """
+
+        else:
+            return jsonify({"error": "Unsupported table"}), 400
+
         results = client.query(query).result()
+
         data = [{
             "amount": float(row["amount"]) if row["amount"] is not None else None,
             "ml_anomaly_score": float(row["ml_anomaly_score"]) if row["ml_anomaly_score"] is not None else None,
             "risk_level": row["risk_level"]
         } for row in results]
+
         return jsonify({"data": data})
+
     except Exception as e:
         print(f"Error fetching scatter chart data: {str(e)}")
         return jsonify({"data": [], "error": str(e)}), 500
+
 
 #Time series data for anomaly counts by hour
 @app.route("/api/charts/timeseries")
 def timeseries_chart():
     try:
-        query = """
-        SELECT 
-            EXTRACT(HOUR FROM entry_time) AS hour,
-            COUNT(*) AS fraud_count
-        FROM `njc-ezpass.ezpass_data.master_viz`
-        WHERE is_anomaly = 1
-        GROUP BY hour
-        ORDER BY hour
-        """
+
+        if TABLE_NAME == "master_viz":
+            query = f"""
+                SELECT 
+                    EXTRACT(HOUR FROM entry_time) AS hour,
+                    COUNT(*) AS fraud_count
+                FROM {get_table()}
+                WHERE is_anomaly = 1
+                GROUP BY hour
+                ORDER BY hour
+            """
+
+        elif TABLE_NAME == "gold_automation":
+            query = f"""
+                SELECT 
+                    EXTRACT(HOUR FROM entry_time) AS hour,
+                    COUNT(*) AS fraud_count
+                FROM {get_table()}
+                WHERE flag_fraud = TRUE
+                GROUP BY hour
+                ORDER BY hour
+            """
+
+        else:
+            return jsonify({"error": "Unsupported table"}), 400
+
         results = client.query(query).result()
+
         data = [{
             "hour": int(row["hour"]),
             "fraud_count": int(row["fraud_count"])
         } for row in results]
+
         return jsonify({"data": data})
+
     except Exception as e:
         print(f"Error fetching timeseries chart data: {str(e)}")
         return jsonify({"data": [], "error": str(e)}), 500
@@ -333,6 +537,64 @@ def update_status():
     # Update status
     update_query = f"""
         UPDATE `njc-ezpass.ezpass_data.master_viz`
+        SET status = '{new_status}', last_updated = CURRENT_TIMESTAMP()
+        WHERE transaction_id = '{transaction_id}'
+    """
+
+    client.query(update_query).result()
+
+    return jsonify({"success": True})
+
+
+    
+# Allowed status transitions
+STATUS_TRANSITIONS = {
+    "No Action Required": [],
+    "Needs Review": ["Resolved - Fraud", "Investigating", "Resolved - Fraud"],
+    "Investigating": ["Resolved - Fraud", "Resolved - Fraud"],
+    "Resolved - Fraud": [],
+    "Resolved - Fraud": []
+}
+
+@app.route("/api/table-info")
+def table_info():
+    """Return information about the current table being used"""
+    return jsonify({
+        "table_name": TABLE_NAME,
+        "is_master_viz": TABLE_NAME == "master_viz",
+        "is_gold_automation": TABLE_NAME == "gold_automation"
+    })
+
+@app.route("/api/transactions/update-status", methods=["POST"])
+def update_status():
+    data = request.get_json()
+    transaction_id = data.get("transactionId")
+    new_status = data.get("newStatus")
+
+    # Get current status
+    query = f"""
+        SELECT status
+        FROM {get_table()}
+        WHERE transaction_id = '{transaction_id}'
+    """
+    results = client.query(query).result()
+    rows = list(results)
+    
+    if not rows:
+        return jsonify({"error": "Transaction not found"}), 404
+
+    current_status = rows[0]["status"]
+
+    # Validate transition
+    if new_status not in STATUS_TRANSITIONS.get(current_status, []):
+        return jsonify({
+            "error": "Invalid status transition",
+            "allowed": STATUS_TRANSITIONS.get(current_status, [])
+        }), 400
+
+    # Update status
+    update_query = f"""
+        UPDATE {get_table()}
         SET status = '{new_status}', last_updated = CURRENT_TIMESTAMP()
         WHERE transaction_id = '{transaction_id}'
     """
