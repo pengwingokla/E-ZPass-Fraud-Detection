@@ -876,7 +876,7 @@ const ScatterPlot = () => {
     useEffect(() => {
         const fetchScatterData = async () => {
             try {
-                const response = await fetch(`${apiUrl}api/charts/scatter`);
+                const response = await fetch(`${apiUrl}/api/charts/scatter`);
                 const result = await response.json();
                 if (result.data && result.data.length > 0) {
                     setChartData(result.data);
@@ -899,12 +899,13 @@ const ScatterPlot = () => {
     }
 
     // Group data by risk level
-    const riskLevels = ['Critical Risk', 'High Risk', 'Medium Risk', 'Low Risk'];
+    const riskLevels = ['Critical Risk', 'High Risk', 'Medium Risk', 'Low Risk', 'No Risk'];
     const colorMap = {
         'Critical Risk': 'rgb(220, 38, 38)',      // Red
         'High Risk': 'rgb(255, 140, 0)',          // Orange/Coral
         'Medium Risk': 'rgb(59, 130, 246)',       // Blue
-        'Low Risk': 'rgb(34, 197, 94)'            // Green
+        'Low Risk': 'rgb(34, 197, 94)',           // Green
+        'No Risk': 'rgb(156, 163, 175)'           // Gray
     };
 
     const traces = riskLevels.map(riskLevel => {
