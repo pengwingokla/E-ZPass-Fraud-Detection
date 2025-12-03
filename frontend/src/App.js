@@ -1227,6 +1227,8 @@ const DataView = () => {
         });
     };
 
+
+
     const handleSort = (column) => {
         if (sortColumn === column) {
             // Toggle direction if same column

@@ -497,6 +497,54 @@ def timeseries_chart():
     except Exception as e:
         print(f"Error fetching timeseries chart data: {str(e)}")
         return jsonify({"data": [], "error": str(e)}), 500
+    
+# Allowed status transitions
+STATUS_TRANSITIONS = {
+    "No Action Required": [],
+    "Needs Review": ["Resolved - Fraud", "Investigating", "Resolved - Fraud"],
+    "Investigating": ["Resolved - Fraud", "Resolved - Fraud"],
+    "Resolved - Fraud": [],
+    "Resolved - Fraud": []
+}
+
+@app.route("/api/transactions/update-status", methods=["POST"])
+def update_status():
+    data = request.get_json()
+    transaction_id = data.get("transactionId")
+    new_status = data.get("newStatus")
+
+    # Get current status
+    query = f"""
+        SELECT status
+        FROM `njc-ezpass.ezpass_data.master_viz`
+        WHERE transaction_id = '{transaction_id}'
+    """
+    results = client.query(query).result()
+    rows = list(results)
+    
+    if not rows:
+        return jsonify({"error": "Transaction not found"}), 404
+
+    current_status = rows[0]["status"]
+
+    # Validate transition
+    if new_status not in STATUS_TRANSITIONS.get(current_status, []):
+        return jsonify({
+            "error": "Invalid status transition",
+            "allowed": STATUS_TRANSITIONS.get(current_status, [])
+        }), 400
+
+    # Update status
+    update_query = f"""
+        UPDATE `njc-ezpass.ezpass_data.master_viz`
+        SET status = '{new_status}', last_updated = CURRENT_TIMESTAMP()
+        WHERE transaction_id = '{transaction_id}'
+    """
+
+    client.query(update_query).result()
+
+    return jsonify({"success": True})
+
 
     
 # Allowed status transitions
