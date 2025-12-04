@@ -2177,7 +2177,7 @@ const handleLogout = () => {
                                             className={`px-6 py-2.5 text-sm font-semibold rounded-lg focus:outline-none transition-all duration-300 ${
                                                 activeView === 'dashboard' 
                                                     ? 'bg-gradient-to-r from-[#9546A7] to-[#7A3A8F] text-white' 
-                                                    : 'text-gray-400 dark:text-gray-400 text-gray-600 hover:text-white dark:hover:text-white hover:text-gray-900'
+                                                    : 'text-gray-400 dark:text-gray-400 text-gray-600 hover:text-black dark:hover:text-white hover:text-gray-900'
                                             }`}
                                         >
                                             Dashboard
@@ -2187,7 +2187,7 @@ const handleLogout = () => {
                                             className={`px-6 py-2.5 text-sm font-semibold rounded-lg focus:outline-none transition-all duration-300 ${
                                                 activeView === 'data' 
                                                     ? 'bg-gradient-to-r from-[#9546A7] to-[#7A3A8F] text-white' 
-                                                    : 'text-gray-400 dark:text-gray-400 text-gray-600 hover:text-white dark:hover:text-white hover:text-gray-900'
+                                                    : 'text-gray-400 dark:text-gray-400 text-gray-600 hover:text-blacks dark:hover:text-white hover:text-gray-900'
                                             }`}
                                         >
                                             Transactions
@@ -2197,7 +2197,7 @@ const handleLogout = () => {
                                             className={`px-6 py-2.5 text-sm font-semibold rounded-lg focus:outline-none transition-all duration-300 ${
                                                 activeView === 'charts' 
                                                     ? 'bg-gradient-to-r from-[#9546A7] to-[#7A3A8F] text-white' 
-                                                    : 'text-gray-400 dark:text-gray-400 text-gray-600 hover:text-white dark:hover:text-white hover:text-gray-900'
+                                                    : 'text-gray-400 dark:text-gray-400 text-gray-600 hover:text-black dark:hover:text-white hover:text-gray-900'
                                             }`}
                                         >
                                             Charts
