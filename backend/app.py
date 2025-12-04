@@ -33,17 +33,102 @@ def get_table():
     return f"`njc-ezpass.ezpass_data.{TABLE_NAME}`"
 
 
-#Get all transactions
+#Get all transactions with pagination
 @app.route("/api/transactions")
 def all_transactions():
-    query = f"""
-    SELECT * 
-    FROM {get_table()}
-    ORDER BY transaction_date DESC
-    """
-    results = client.query(query).result()
-    rows = [dict(row) for row in results]
-    return jsonify({"data": rows})
+    try:
+        # Get pagination parameters
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 50))  # Default 50 rows per page
+        offset = (page - 1) * limit
+        
+        # Get search and filter parameters
+        search = request.args.get('search', '').strip().replace("'", "''")  # Escape single quotes
+        status_filter = request.args.get('status', '').strip().replace("'", "''")
+        category_filter = request.args.get('category', '').strip().replace("'", "''")
+        
+        # Build WHERE clause
+        where_conditions = []
+        
+        if search:
+            where_conditions.append(f"""
+                (LOWER(CAST(transaction_id AS STRING)) LIKE LOWER('%{search}%')
+                 OR LOWER(tag_plate_number) LIKE LOWER('%{search}%')
+                 OR LOWER(CAST(ml_predicted_category AS STRING)) LIKE LOWER('%{search}%')
+                 OR LOWER(CAST(threat_severity AS STRING)) LIKE LOWER('%{search}%'))
+            """)
+        
+        if status_filter and status_filter != 'all':
+            where_conditions.append(f"status = '{status_filter}'")
+        
+        if category_filter and category_filter != 'all':
+            if TABLE_NAME == "master_viz":
+                where_conditions.append(f"LOWER(ml_predicted_category) = LOWER('{category_filter}')")
+            else:
+                where_conditions.append(f"LOWER(threat_severity) = LOWER('{category_filter}')")
+        
+        where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
+        
+        # Build query with pagination
+        query = f"""
+        SELECT * 
+        FROM {get_table()}
+        {where_clause}
+        ORDER BY transaction_date DESC
+        LIMIT {limit}
+        OFFSET {offset}
+        """
+        
+        results = client.query(query).result()
+        rows = [dict(row) for row in results]
+        return jsonify({"data": rows, "page": page, "limit": limit})
+    except Exception as e:
+        print(f"Error fetching transactions: {str(e)}")
+        return jsonify({"data": [], "error": str(e)}), 500
+
+#Get total count of transactions (for pagination)
+@app.route("/api/transactions/count")
+def transactions_count():
+    try:
+        # Get filter parameters (same as all_transactions)
+        search = request.args.get('search', '').strip().replace("'", "''")  # Escape single quotes
+        status_filter = request.args.get('status', '').strip().replace("'", "''")
+        category_filter = request.args.get('category', '').strip().replace("'", "''")
+        
+        # Build WHERE clause (same logic as all_transactions)
+        where_conditions = []
+        
+        if search:
+            where_conditions.append(f"""
+                (LOWER(CAST(transaction_id AS STRING)) LIKE LOWER('%{search}%')
+                 OR LOWER(tag_plate_number) LIKE LOWER('%{search}%')
+                 OR LOWER(CAST(ml_predicted_category AS STRING)) LIKE LOWER('%{search}%')
+                 OR LOWER(CAST(threat_severity AS STRING)) LIKE LOWER('%{search}%'))
+            """)
+        
+        if status_filter and status_filter != 'all':
+            where_conditions.append(f"status = '{status_filter}'")
+        
+        if category_filter and category_filter != 'all':
+            if TABLE_NAME == "master_viz":
+                where_conditions.append(f"LOWER(ml_predicted_category) = LOWER('{category_filter}')")
+            else:
+                where_conditions.append(f"LOWER(threat_severity) = LOWER('{category_filter}')")
+        
+        where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
+        
+        query = f"""
+        SELECT COUNT(*) AS total
+        FROM {get_table()}
+        {where_clause}
+        """
+        
+        results = client.query(query).result()
+        total = dict(next(results))["total"]
+        return jsonify({"total": int(total)})
+    except Exception as e:
+        print(f"Error fetching transaction count: {str(e)}")
+        return jsonify({"total": 0, "error": str(e)}), 500
 
 #Get flagged or investigating transactions (Recent Alerts)
 @app.route("/api/transactions/alerts")

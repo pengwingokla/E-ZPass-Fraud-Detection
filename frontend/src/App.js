@@ -8,16 +8,40 @@ Chart.register(...registerables);
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
-const fetchTransactions = async () => {
+const fetchTransactions = async (page = 1, limit = 50, search = '', status = 'all', category = 'all') => {
     try {
-        console.log(import.meta.env);
-        const response = await fetch(`${apiUrl}/api/transactions`);
+        const params = new URLSearchParams({
+            page: page.toString(),
+            limit: limit.toString(),
+        });
+        if (search) params.append('search', search);
+        if (status && status !== 'all') params.append('status', status);
+        if (category && category !== 'all') params.append('category', category);
+        
+        const response = await fetch(`${apiUrl}/api/transactions?${params.toString()}`);
         if (!response.ok) throw new Error('Failed to fetch data');
-        const { data } = await response.json(); // extract array
-        return data || [];
+        const result = await response.json();
+        return result.data || [];
     } catch (err) {
         console.error(err);
         return [];
+    }
+};
+
+const fetchTransactionsCount = async (search = '', status = 'all', category = 'all') => {
+    try {
+        const params = new URLSearchParams();
+        if (search) params.append('search', search);
+        if (status && status !== 'all') params.append('status', status);
+        if (category && category !== 'all') params.append('category', category);
+        
+        const response = await fetch(`${apiUrl}/api/transactions/count?${params.toString()}`);
+        if (!response.ok) throw new Error('Failed to fetch count');
+        const result = await response.json();
+        return result.total || 0;
+    } catch (err) {
+        console.error(err);
+        return 0;
     }
 };
 
@@ -1173,13 +1197,14 @@ const DataView = () => {
 
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
-    const [filterMLCategory, setFilterMLCategory] = useState('Critical Risk');
+    const [filterMLCategory, setFilterMLCategory] = useState('all');
     const [sortColumn, setSortColumn] = useState(null);
     const [sortDirection, setSortDirection] = useState('asc'); // 'asc' or 'desc'
     const [transactionData, setTransactionData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 15; // rows per page
+    const [totalCount, setTotalCount] = useState(0);
+    const itemsPerPage = 50; // rows per page (increased for better performance)
     const STATUS_TRANSITIONS = {
         "No Action Required": [],   // cannot change
         "Needs Review": ["Resolved - Not Fraud", "Investigating", "Resolved - Fraud"],
@@ -1200,24 +1225,50 @@ const DataView = () => {
     };
 
     const [tableType, setTableType] = useState('master_viz');
+    const [searchDebounce, setSearchDebounce] = useState('');
 
+    // Debounce search input
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setSearchDebounce(searchTerm);
+        }, 500); // 500ms debounce
+
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    // Fetch data when page, search, or filters change
     useEffect(() => {
         const loadData = async () => {
             setLoading(true);
-            const data = await fetchTransactions();
-            setTransactionData(data);
-            // Detect table type from the data
-            if (data && data.length > 0) {
-                setTableType(detectTableType(data));
+            try {
+                // Fetch data and count in parallel
+                const [data, count] = await Promise.all([
+                    fetchTransactions(currentPage, itemsPerPage, searchDebounce, filterStatus, filterMLCategory),
+                    fetchTransactionsCount(searchDebounce, filterStatus, filterMLCategory)
+                ]);
+                
+                setTransactionData(data);
+                setTotalCount(count);
+                
+                // Detect table type from the data
+                if (data && data.length > 0) {
+                    setTableType(detectTableType(data));
+                }
+            } catch (error) {
+                console.error('Error loading transactions:', error);
+                setTransactionData([]);
+                setTotalCount(0);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
         loadData();
-    }, []);
+    }, [currentPage, searchDebounce, filterStatus, filterMLCategory]);
 
+    // Reset to page 1 when search or filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm, filterStatus, filterMLCategory, sortColumn, sortDirection]);
+    }, [searchDebounce, filterStatus, filterMLCategory]);
 
     const handleStatusChange = (transactionId, newStatus) => {
         setTransactionData(prev =>
@@ -1338,26 +1389,10 @@ const DataView = () => {
         }
     };
 
-    // Filter data
-    let filteredData = transactionData.filter(row => {
-        const id = row.id || row.transaction_id || '';
-        const category = row.category || row.ml_predicted_category || row.threat_severity || '';
-        const tagPlate = row.tag_plate_number || row.tagPlate || '';
-        const matchesSearch = id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            tagPlate.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesStatusFilter = filterStatus === 'all' || row.status === filterStatus;
-        // For master_viz: use ml_predicted_category, for gold_automation: use threat_severity
-        const riskCategory = tableType === 'gold_automation' ? row.threat_severity : row.ml_predicted_category;
-        const matchesMLCategoryFilter = filterMLCategory === 'all' || 
-                                       (riskCategory && 
-                                        riskCategory.toLowerCase() === filterMLCategory.toLowerCase());
-        return matchesSearch && matchesStatusFilter && matchesMLCategoryFilter;
-    });
-
-    // Sort data
+    // Client-side sorting for current page only (server handles filtering and pagination)
+    let sortedData = [...transactionData];
     if (sortColumn) {
-        filteredData = [...filteredData].sort((a, b) => {
+        sortedData = sortedData.sort((a, b) => {
             let aValue, bValue;
    
             // Numeric columns
@@ -1405,14 +1440,11 @@ const DataView = () => {
         });
     }
 
-    // Slice the filtered data for the current page
-    const paginatedData = filteredData.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
-    );
+    // Data is already paginated from server
+    const paginatedData = sortedData;
 
-    // Total pages
-    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+    // Total pages based on server count
+    const totalPages = Math.ceil(totalCount / itemsPerPage);
 
 
 
@@ -1889,8 +1921,8 @@ const DataView = () => {
                         Showing <span className="font-semibold dark:text-white text-gray-900">
                             {paginatedData.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}
                         </span> to <span className="font-semibold dark:text-white text-gray-900">
-                            {Math.min(currentPage * itemsPerPage, filteredData.length)}
-                        </span> of <span className="font-semibold dark:text-white text-gray-900">{filteredData.length}</span> transactions
+                            {Math.min(currentPage * itemsPerPage, totalCount)}
+                        </span> of <span className="font-semibold dark:text-white text-gray-900">{totalCount}</span> transactions
                     </div>
                     <div className="flex items-center space-x-2">
                         <button 
