@@ -51,12 +51,13 @@ def all_transactions():
         where_conditions = []
         
         if search:
-            where_conditions.append(f"""
-                (LOWER(CAST(transaction_id AS STRING)) LIKE LOWER('%{search}%')
-                 OR LOWER(tag_plate_number) LIKE LOWER('%{search}%')
-                 OR LOWER(CAST(ml_predicted_category AS STRING)) LIKE LOWER('%{search}%')
-                 OR LOWER(CAST(threat_severity AS STRING)) LIKE LOWER('%{search}%'))
-            """)
+            # Handle NULL values properly in BigQuery using COALESCE
+            # Search condition depends on table type
+            if TABLE_NAME == "master_viz":
+                where_conditions.append(f"(LOWER(COALESCE(CAST(transaction_id AS STRING), '')) LIKE LOWER('%{search}%') OR LOWER(COALESCE(tag_plate_number, '')) LIKE LOWER('%{search}%') OR LOWER(COALESCE(CAST(ml_predicted_category AS STRING), '')) LIKE LOWER('%{search}%'))")
+            else:
+                # gold_automation table
+                where_conditions.append(f"(LOWER(COALESCE(CAST(transaction_id AS STRING), '')) LIKE LOWER('%{search}%') OR LOWER(COALESCE(tag_plate_number, '')) LIKE LOWER('%{search}%') OR LOWER(COALESCE(CAST(threat_severity AS STRING), '')) LIKE LOWER('%{search}%'))")
         
         if status_filter and status_filter != 'all':
             where_conditions.append(f"status = '{status_filter}'")
@@ -83,8 +84,12 @@ def all_transactions():
         rows = [dict(row) for row in results]
         return jsonify({"data": rows, "page": page, "limit": limit})
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
         print(f"Error fetching transactions: {str(e)}")
-        return jsonify({"data": [], "error": str(e)}), 500
+        print(f"Query: {query}")
+        print(f"Traceback: {error_trace}")
+        return jsonify({"data": [], "error": str(e), "query": query if 'query' in locals() else "N/A"}), 500
 
 #Get total count of transactions (for pagination)
 @app.route("/api/transactions/count")
@@ -99,12 +104,13 @@ def transactions_count():
         where_conditions = []
         
         if search:
-            where_conditions.append(f"""
-                (LOWER(CAST(transaction_id AS STRING)) LIKE LOWER('%{search}%')
-                 OR LOWER(tag_plate_number) LIKE LOWER('%{search}%')
-                 OR LOWER(CAST(ml_predicted_category AS STRING)) LIKE LOWER('%{search}%')
-                 OR LOWER(CAST(threat_severity AS STRING)) LIKE LOWER('%{search}%'))
-            """)
+            # Handle NULL values properly in BigQuery using COALESCE
+            # Search condition depends on table type
+            if TABLE_NAME == "master_viz":
+                where_conditions.append(f"(LOWER(COALESCE(CAST(transaction_id AS STRING), '')) LIKE LOWER('%{search}%') OR LOWER(COALESCE(tag_plate_number, '')) LIKE LOWER('%{search}%') OR LOWER(COALESCE(CAST(ml_predicted_category AS STRING), '')) LIKE LOWER('%{search}%'))")
+            else:
+                # gold_automation table
+                where_conditions.append(f"(LOWER(COALESCE(CAST(transaction_id AS STRING), '')) LIKE LOWER('%{search}%') OR LOWER(COALESCE(tag_plate_number, '')) LIKE LOWER('%{search}%') OR LOWER(COALESCE(CAST(threat_severity AS STRING), '')) LIKE LOWER('%{search}%'))")
         
         if status_filter and status_filter != 'all':
             where_conditions.append(f"status = '{status_filter}'")
@@ -127,8 +133,12 @@ def transactions_count():
         total = dict(next(results))["total"]
         return jsonify({"total": int(total)})
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
         print(f"Error fetching transaction count: {str(e)}")
-        return jsonify({"total": 0, "error": str(e)}), 500
+        print(f"Query: {query}")
+        print(f"Traceback: {error_trace}")
+        return jsonify({"total": 0, "error": str(e), "query": query if 'query' in locals() else "N/A"}), 500
 
 #Get flagged or investigating transactions (Recent Alerts)
 @app.route("/api/transactions/alerts")
@@ -573,49 +583,76 @@ def timeseries_chart():
 # Allowed status transitions
 STATUS_TRANSITIONS = {
     "No Action Required": [],
-    "Needs Review": ["Resolved - Fraud", "Investigating", "Resolved - Fraud"],
-    "Investigating": ["Resolved - Fraud", "Resolved - Fraud"],
-    "Resolved - Fraud": [],
+    "Needs Review": ["Resolved - Not Fraud", "Investigating", "Resolved - Fraud"],
+    "Investigating": ["Resolved - Not Fraud", "Resolved - Fraud"],
+    "Resolved - Not Fraud": [],
     "Resolved - Fraud": []
 }
 
 @app.route("/api/transactions/update-status", methods=["POST"])
 def update_status():
-    data = request.get_json()
-    transaction_id = data.get("transactionId")
-    new_status = data.get("newStatus")
+    try:
+        data = request.get_json()
+        transaction_id = data.get("transactionId")
+        new_status = data.get("newStatus")
 
-    # Get current status
-    query = f"""
-        SELECT status
-        FROM `njc-ezpass.ezpass_data.master_viz`
-        WHERE transaction_id = '{transaction_id}'
-    """
-    results = client.query(query).result()
-    rows = list(results)
-    
-    if not rows:
-        return jsonify({"error": "Transaction not found"}), 404
+        if not transaction_id or not new_status:
+            return jsonify({"error": "Missing transactionId or newStatus"}), 400
 
-    current_status = rows[0]["status"]
+        # Escape single quotes in transaction_id to prevent SQL injection
+        transaction_id_escaped = str(transaction_id).replace("'", "''")
+        new_status_escaped = str(new_status).replace("'", "''")
 
-    # Validate transition
-    if new_status not in STATUS_TRANSITIONS.get(current_status, []):
-        return jsonify({
-            "error": "Invalid status transition",
-            "allowed": STATUS_TRANSITIONS.get(current_status, [])
-        }), 400
+        # Get current status
+        query = f"""
+            SELECT status
+            FROM {get_table()}
+            WHERE transaction_id = '{transaction_id_escaped}'
+        """
+        results = client.query(query).result()
+        rows = list(results)
+        
+        if not rows:
+            return jsonify({"error": "Transaction not found"}), 404
 
-    # Update status
-    update_query = f"""
-        UPDATE `njc-ezpass.ezpass_data.master_viz`
-        SET status = '{new_status}', last_updated = CURRENT_TIMESTAMP()
-        WHERE transaction_id = '{transaction_id}'
-    """
+        current_status = rows[0].get("status")
+        
+        # Handle NULL status - allow setting status if current status is NULL
+        if current_status is None:
+            # Allow setting any status if current status is NULL
+            pass
+        else:
+            # Validate transition
+            allowed_transitions = STATUS_TRANSITIONS.get(current_status, [])
+            if new_status not in allowed_transitions:
+                return jsonify({
+                    "error": "Invalid status transition",
+                    "current_status": current_status,
+                    "new_status": new_status,
+                    "allowed": allowed_transitions
+                }), 400
 
-    client.query(update_query).result()
+        # Update status - only update last_updated if the column exists
+        if TABLE_NAME == "master_viz":
+            update_query = f"""
+                UPDATE {get_table()}
+                SET status = '{new_status_escaped}', last_updated = CURRENT_TIMESTAMP()
+                WHERE transaction_id = '{transaction_id_escaped}'
+            """
+        else:
+            # gold_automation might not have last_updated column
+            update_query = f"""
+                UPDATE {get_table()}
+                SET status = '{new_status_escaped}'
+                WHERE transaction_id = '{transaction_id_escaped}'
+            """
 
-    return jsonify({"success": True})
+        client.query(update_query).result()
+
+        return jsonify({"success": True})
+    except Exception as e:
+        print(f"Error updating transaction status: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/table-info")
