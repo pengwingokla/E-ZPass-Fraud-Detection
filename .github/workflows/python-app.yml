@@ -36,9 +36,8 @@ jobs:
           pip install pytest pytest-mock
 
       - name: Set environment variables
-        run: echo "${{ secrets.BIGQUERY_KEY_JSON }}" > bigquery_key.json
-        env:
-          BIGQUERY_KEY_JSON: ${{ secrets.BIGQUERY_KEY_JSON }}
+        run: echo "BIGQUERY_KEY_JSON=${{ secrets.BIGQUERY_KEY_JSON }}" >> $GITHUB_ENV
+
 
       - name: Run tests
         run: |
