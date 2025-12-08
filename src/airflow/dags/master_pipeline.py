@@ -49,7 +49,7 @@ with DAG(
     'master_pipeline',
     default_args=default_args,
     description='Master pipeline that orchestrates: File detection -> GCS upload -> BigQuery load -> dbt transformation',
-    schedule_interval='@hourly',  # Check for new files hourly
+    schedule_interval=None,
     catchup=False,
     tags=['master', 'orchestration', 'etl'],
 ) as dag:
@@ -61,7 +61,6 @@ with DAG(
         poke_interval=10,  # Check every 10 seconds
         timeout=60,  # Check once, timeout after 60 seconds if no files
         mode='poke',  # Check for files
-        provide_context=True,
     )
     
     # Step 1: Trigger GCS upload raw data DAG

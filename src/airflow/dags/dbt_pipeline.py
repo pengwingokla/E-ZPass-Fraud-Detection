@@ -31,7 +31,7 @@ with DAG(
     'dbt_pipeline',
     default_args=default_args,
     description='Run dbt models for data transformation, feature engineering and automated training pipeline',
-    schedule_interval=None,  # Manual trigger or set to desired schedule
+    schedule_interval=None,
     catchup=False,
     tags=['dbt', 'bronze', 'silver', 'gold', 'data-transformation'],
 ) as dag:

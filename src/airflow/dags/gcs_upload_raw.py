@@ -460,7 +460,7 @@ with DAG(
     'gcs_upload_raw',
     default_args=default_args,
     description='Detect, normalize, rename, and upload CSV files to GCS',
-    schedule_interval=None,  # Manual trigger only
+    schedule_interval=None,
     catchup=False,
     tags=['gcs', 'csv', 'upload', 'ezpass', 'etl'],
 ) as dag:
