@@ -1,0 +1,68 @@
+version: 2
+
+models:
+  - name: bronze
+    description: >
+      Deduplicated raw transaction data from the bronze source. This model removes duplicate 
+      transaction rows based on key transaction fields (transaction_date, tag_plate_number, 
+      entry_time/plaza, exit_time/plaza, amount, agency). When duplicates are found, the row 
+      with the most recent loaded_at timestamp is kept, ensuring data quality before processing 
+      in the silver layer.
+    columns:
+      - name: posting_date
+        description: Date transaction was posted (STRING YYYY-MM-DD)
+        
+      - name: transaction_date
+        description: Date of the actual transaction (STRING YYYY-MM-DD)
+        
+      - name: tag_plate_number
+        description: EZ-Pass tag or license plate number
+        
+      - name: agency
+        description: Toll agency (e.g., NJTA)
+        
+      - name: description
+        description: Transaction description
+        
+      - name: entry_time
+        description: Entry timestamp (STRING YYYY-MM-DD HH:MM:SS)
+        
+      - name: entry_plaza
+        description: Entry toll plaza name
+        
+      - name: entry_lane
+        description: Entry lane number
+        
+      - name: exit_time
+        description: Exit timestamp (STRING YYYY-MM-DD HH:MM:SS)
+        
+      - name: exit_plaza
+        description: Exit toll plaza name
+        
+      - name: exit_lane
+        description: Exit lane number
+        
+      - name: vehicle_type_code
+        description: Vehicle classification code
+        
+      - name: amount
+        description: Transaction amount (STRING, negative for tolls)
+        
+      - name: prepaid
+        description: Prepaid amount (STRING)
+        
+      - name: plan_rate
+        description: Rate plan type
+        
+      - name: fare_type
+        description: Fare category
+        
+      - name: balance
+        description: Account balance after transaction (STRING)
+        
+      - name: loaded_at
+        description: Timestamp when loaded to BigQuery (STRING)
+        
+      - name: source_file
+        description: Original CSV filename
+

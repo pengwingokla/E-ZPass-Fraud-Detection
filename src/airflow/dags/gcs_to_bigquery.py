@@ -417,7 +417,7 @@ with DAG(
     'gcs_to_bigquery_pipeline',
     default_args=default_args,
     description='Load CSV files from GCS into BigQuery bronze table',
-    schedule_interval=None,  # Manual trigger only
+    schedule_interval=None,
     catchup=False,
     tags=['bigquery', 'gcs', 'bronze', 'ezpass', 'etl'],
 ) as dag:
