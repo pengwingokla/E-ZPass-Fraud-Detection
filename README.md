@@ -112,4 +112,5 @@ _To be determined_
 - [New Jersey Courts](https://www.njcourts.gov/)
 - [Setup Manual](docs/setup-manual.html)
 - [API Reference](docs/setup-manual.html#api-overview)
+- [Google Slides](https://docs.google.com/presentation/d/1pgGwSzpV89Q9UtXA7dg9pa52v4l-0iMfACFaLnFE840/edit?usp=sharing)
 - [Project Documentation](https://drive.google.com/drive/folders/1k9JhQVRJAZEYMZTjLwgfGh1DHFsIAv2a?usp=sharing)
