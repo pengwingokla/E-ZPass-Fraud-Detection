@@ -1190,23 +1190,56 @@
             <h3>1. Install Dependencies</h3>
             <div class="command">cd frontend</div>
             <div class="command">npm install</div>
+
+            <h3>2. Create Environment File</h3>
+            <p>Copy the template and fill in your values:</p>
+            <div class="command">cp env.template .env</div>
             
-            <h3>2. Configure API Endpoint</h3>
-            <p>Update the API URL in <code>frontend/src/App.js</code> if needed:</p>
-            <div class="command">const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';</div>
+            <h3>3. Configure Environment Variables</h3>
+            <p>Create the <code>.env</code> file with your configuration:</p>
             
-            <h3>3. Start Development Server</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Variable</th>
+                        <th>Description</th>
+                        <th>Required</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>REACT_APP_API_URL</code></td>
+                        <td>Your backend URL</td>
+                        <td><span class="badge badge-required">Required</span></td>
+                    </tr>
+                    <tr>
+                        <td><code>GENERATE_SOURCEMAP</code></td>
+                        <td>Source map config</td>
+                        <td><span class="badge badge-required">Required</span></td>
+                    </tr>
+                    <tr>
+                        <td><code>REACT_APP_REDIRECT_URL</code></td>
+                        <td>Redirect link after auth</td>
+                        <td><span class="badge badge-optional">Required</span></td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div class="warning">
+                <strong>Important:</strong> Never commit the <code>.env</code> file to version control. It contains sensitive credentials.
+            </div>
+            
+            <h3>4. Start Development Server</h3>
             <div class="command">npm start</div>
             <p>The frontend will be available at <a href="http://localhost:3000" target="_blank">http://localhost:3000</a></p>
             
-            <h3>4. Build for Production</h3>
-            <div class="command">npm run build</div>
         </section>
         
         <section id="backend-setup">
             <h2>Backend</h2>
             
             <h3>1. Create Virtual Environment</h3>
+            <div class="command">cd backend</div>
             <div class="command">python3 -m venv venv</div>
             <div class="command">source venv/bin/activate  # On Windows: venv\Scripts\activate</div>
             
@@ -1214,13 +1247,42 @@
             <div class="command">pip install -r requirements.txt</div>
             <div class="command">pip install -r backend/requirements.txt</div>
             
-            <h3>3. Configure Backend</h3>
-            <p>Ensure BigQuery credentials are set up in <code>backend/keys/bigquery.json</code></p>
+            <h3>3. Create Environment File</h3>
+            <p>Copy the template and fill in your values:</p>
+            <div class="command">cp env.template .env</div>
             
-            <h3>4. Start Backend Server</h3>
-            <div class="command">cd backend</div>
+            <h3>4. Configure Environment Variables</h3>
+            <p>Create the <code>.env</code> file with your configuration:</p>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Variable</th>
+                        <th>Description</th>
+                        <th>Required</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>BIGQUERY_KEY_JSON</code></td>
+                        <td>Bigquery key json</td>
+                        <td><span class="badge badge-required">Required</span></td>
+                    </tr>
+                    <tr>
+                        <td><code>BIGQUERY_TABLE</code></td>
+                        <td>Table that will be used to fetch data</td>
+                        <td><span class="badge badge-required">Required</span></td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div class="warning">
+                <strong>Important:</strong> Never commit the <code>.env</code> file to version control. It contains sensitive credentials.
+            </div>
+            
+            <h3>5. Start Backend Server</h3>
             <div class="command">python app.py</div>
-            <p>The backend API will be available at <a href="http://localhost:5000" target="_blank">http://localhost:5000</a></p>
+            <p>The backend API will be available at <a href="http://localhost:5001" target="_blank">http://localhost:5001</a></p>
         </section>
         
         <section id="verification">
