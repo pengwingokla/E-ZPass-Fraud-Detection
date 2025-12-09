@@ -1,0 +1,1848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-ZPass Fraud Detection - Setup Manual</title>
+    <style>
+        html {
+            scroll-behavior: smooth;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            font-size: 16px;
+            line-height: 1.6;
+            color: #444;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        
+        header {
+            display: none;
+        }
+        
+        .main-wrapper {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        .sidebar {
+            width: 280px;
+            background: #f7f8fa;
+            position: fixed;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            overflow-y: auto;
+            padding: 0;
+            z-index: 50;
+        }
+        
+        .sidebar-title {
+            padding: 15px 20px;
+            border-bottom: 1px solid #e9ecef;
+            background: #f7f8fa;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .sidebar-logo {
+            width: 24px;
+            height: 24px;
+            position: relative;
+            flex-shrink: 0;
+        }
+        
+        .sidebar-logo::before {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #667eea;
+            border-right: none;
+            border-bottom: none;
+            border-radius: 2px 0 0 0;
+        }
+        
+        .sidebar-logo::after {
+            content: '';
+            position: absolute;
+            bottom: 2px;
+            left: 2px;
+            width: 4px;
+            height: 4px;
+            background: #000;
+            border-radius: 50%;
+        }
+        
+        .sidebar-title h1 {
+            font-size: 1.2em;
+            margin: 0;
+            color: #000;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+            line-height: 1.2;
+        }
+        
+        .sidebar-docs-btn {
+            background: #761E85;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 10px;
+            font-size: 0.75em;
+            font-weight: 500;
+            cursor: pointer;
+            margin-left: auto;
+        }
+        
+        .sidebar-status-dot {
+            width: 8px;
+            height: 8px;
+            background: #28a745;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        
+        .sidebar-title p {
+            display: none;
+        }
+        
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .sidebar::-webkit-scrollbar-track {
+            background: #eef2f6;
+        }
+        
+        .sidebar::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 3px;
+        }
+        
+        .sidebar::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        .toc {
+            padding: 25px 20px;
+        }
+        
+        .toc h2 {
+            color: #1a1a1a;
+            font-size: 0.85em;
+            font-weight: 700;
+            text-transform: none;
+            letter-spacing: 0;
+            position: sticky;
+            top: 0;
+            background: #f7f8fa;
+            margin: 0;
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .toc h2::after {
+            content: '▼';
+            font-size: 0.7em;
+            color: #4a5568;
+            margin-left: auto;
+            transition: transform 0.3s ease;
+        }
+        
+        .toc h2.collapsed::after {
+            transform: rotate(-90deg);
+        }
+        
+        
+        .toc ul {
+            list-style: none;
+            padding-left: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+        }
+        
+        .toc h2.collapsed + ul {
+            max-height: 0 !important;
+            opacity: 0;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .toc h2:not(.collapsed) + ul {
+            max-height: 2000px;
+            opacity: 1;
+        }
+        
+        .toc li {
+            margin: 4px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+        
+        .toc li::before {
+            content: '';
+            position: absolute;
+            left: 8px;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: #e5e7eb;
+        }
+        
+        .toc a {
+            color: #4a5568;
+            text-decoration: none;
+            padding: 6px 15px;
+            display: block;
+            border-left: none;
+            transition: all 0.3s;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+        
+        .toc a:hover {
+            color: #8a00c2;
+        }
+        
+        .content {
+            margin-left: 280px;
+            flex: 1;
+            padding: 30px 40px;
+            max-width: 70%;
+            background: white;
+            margin-top: 0;
+            margin-bottom: 0;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0;
+        }
+        
+        section {
+            background: white;
+            padding: 50px 0 0 0;
+            margin-left: 50px;
+            margin-bottom: 0;
+            border-radius: 0;
+            box-shadow: none;
+        }
+        
+        section p {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #444;
+            margin: 12px 0;
+        }
+        
+        section h2:first-child {
+            margin-top: 0;
+        }
+        
+        section h1 {
+            color: #1a1a1a;
+            font-size: 36px;
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 12px;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+        
+        section h2 {
+            color: #1a1a1a;
+            font-size: 26px;
+            font-weight: 600;
+            line-height: 1.3;
+            margin-top: 48px;
+            margin-bottom: 16px;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+        
+        section h3 {
+            color: #1a1a1a;
+            font-size: 20px;
+            font-weight: 600;
+            line-height: 1.4;
+            margin-top: 32px;
+            margin-bottom: 12px;
+        }
+        
+        section h4 {
+            color: #1a1a1a;
+            font-size: 18px;
+            font-weight: 500;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        
+        pre {
+            background: #e8bcf0;
+            border: none;
+            border-radius: 6px;
+            padding: 12px 16px;
+            overflow-x: auto;
+            margin: 15px 0;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
+            font-size: 13px;
+            line-height: 1.45;
+            color: #1a1a1a;
+        }
+        
+        code {
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
+        }
+        
+        p code,
+        li code,
+        strong code,
+        td code,
+        th code,
+        .warning code,
+        .info code,
+        .success code {
+            background: transparent;
+            padding: 0;
+            border-radius: 0;
+            font-size: 0.9em;
+            white-space: normal;
+            display: inline;
+        }
+        
+        section > code,
+        section > p + code,
+        code:not(p code):not(li code):not(strong code):not(a code):not(td code):not(th code):not(.warning code):not(.info code):not(.success code) {
+            display: block;
+            background: #fcedff;
+            padding: 12px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-size: 13px;
+            overflow-x: auto;
+            white-space: pre;
+        }
+        
+        pre code {
+            background: #e8bcf0 !important;
+            padding: 0 !important;
+            border-radius: 0 !important;
+            color: #1a1a1a;
+            font-size: 13px;
+        }
+        
+        .warning {
+            background: #FFFCED;
+            border-left: 4px solid #FFEC8E;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        
+        .info {
+            background: #f7f8fa;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        
+        .success {
+            background: #EDFFF3;
+            border-left: 4px solid #5FFF95;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        
+        .step {
+            counter-increment: step-counter;
+            margin: 24px 0;
+            padding: 0;
+            padding-left: 5px;
+            background: transparent;
+            border-radius: 0;
+            position: relative;
+            border-left: none;
+            min-height: 40px;
+            margin-left: 50px;
+        }
+        
+        .step::after {
+            content: '';
+            position: absolute;
+            left: -34px;
+            top: 32px;
+            bottom: -24px;
+            width: 1px;
+            background: #e5e7eb;
+        }
+        
+        .step::before {
+            content: counter(step-counter);
+            font-weight: normal;
+            color: #1a1a1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #e5e7eb;
+            position: absolute;
+            left: -50px;
+            top: 0;
+            font-size: 14px;
+            line-height: 1;
+            z-index: 1;
+        }
+        
+        .step strong {
+            display: block;
+            color: #1a1a1a;
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 6px;
+            margin-top: 0;
+            padding-left: 0;
+            line-height: 1.4;
+            padding-top: 4px;
+        }
+        
+        .step p {
+            color: #1a1a1a;
+            margin: 0;
+            padding-left: 0;
+            font-size: 16px;
+            line-height: 1.5;
+            font-weight: 400;
+        }
+        
+        .step li {
+            font-size: 16px;
+        }
+        
+        .step li strong {
+            font-weight: 600;
+            color: #1a1a1a;
+            font-size: 16px;
+        }
+        
+        .step ul,
+        .step ol {
+            margin: 8px 0;
+            padding-left: 0;
+            list-style: none;
+        }
+        
+        .step li {
+            list-style: none;
+        }
+        
+        .step .command {
+            margin: 8px 0;
+        }
+        
+        ol.steps {
+            counter-reset: step-counter;
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        ul {
+            margin: 10px 0;
+            padding-left: 25px;
+            font-size: 16px;
+        }
+        
+        li {
+            margin: 8px 0;
+            font-size: 16px;
+        }
+        
+        .command {
+            background: #fcedff;
+            color: #1a1a1a;
+            padding: 12px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
+            font-size: 13px;
+            white-space: pre;
+            overflow-x: auto;
+        }
+        
+        .command::before {
+            content: "$ ";
+            color: #1a1a1a;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #761E85;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        
+        .badge-required {
+            background: #761E85;
+            color: white;
+        }
+        
+        .badge-optional {
+            background: #f7f8fa;
+            color: #7b7b7b;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin: 32px 0;
+        }
+        
+        .feature-card {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            transition: box-shadow 0.2s ease, transform 0.2s ease;
+            border: 1px solid #e9ecef;
+        }
+        
+        .feature-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+            transform: translateY(-2px);
+        }
+        
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            background: #f7f8fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+            position: relative;
+        }
+        
+        .icon-search {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #761E85;
+            border-radius: 50%;
+            position: relative;
+        }
+        
+        .icon-search::after {
+            content: '';
+            position: absolute;
+            width: 8px;
+            height: 2px;
+            background: #761E85;
+            bottom: -6px;
+            right: -6px;
+            transform: rotate(45deg);
+        }
+        
+        .icon-lightning {
+            width: 14px;
+            height: 18px;
+            position: relative;
+        }
+        
+        .icon-lightning::before {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-left: 3px solid transparent;
+            border-right: 3px solid transparent;
+            border-bottom: 9px solid #761E85;
+            top: 0;
+            left: 2px;
+        }
+        
+        .icon-lightning::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-left: 3px solid transparent;
+            border-right: 3px solid transparent;
+            border-top: 9px solid #761E85;
+            bottom: 0;
+            left: 6px;
+        }
+        
+        .icon-chart {
+            width: 20px;
+            height: 16px;
+            position: relative;
+        }
+        
+        .icon-chart::before {
+            content: '';
+            position: absolute;
+            width: 3px;
+            height: 12px;
+            background: #761E85;
+            left: 0;
+            bottom: 0;
+        }
+        
+        .icon-chart::after {
+            content: '';
+            position: absolute;
+            width: 3px;
+            height: 8px;
+            background: #761E85;
+            left: 6px;
+            bottom: 0;
+        }
+        
+        .icon-chart span {
+            position: absolute;
+            width: 3px;
+            height: 10px;
+            background: #761E85;
+            left: 12px;
+            bottom: 0;
+        }
+        
+        .icon-cloud {
+            width: 20px;
+            height: 14px;
+            position: relative;
+        }
+        
+        .icon-cloud::before {
+            content: '';
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #761E85;
+            border-radius: 50%;
+            left: 0;
+            top: 2px;
+        }
+        
+        .icon-cloud::after {
+            content: '';
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border: 2px solid #761E85;
+            border-radius: 50%;
+            right: 0;
+            top: 0;
+        }
+        
+        .feature-card h3 {
+            margin-top: 0;
+            margin-bottom: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+        
+        .feature-card p {
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #4a5568;
+        }
+        
+        .feature-card ul {
+            margin: 12px 0 0 0;
+            padding-left: 20px;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #4a5568;
+        }
+        
+        .feature-card li {
+            margin: 6px 0;
+            font-size: 14px;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar-title {
+                position: relative;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                position: relative;
+                width: 100%;
+                top: 0;
+                max-height: 300px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            
+            .content {
+                margin-left: 0;
+                max-width: 100%;
+                padding: 20px;
+            }
+            
+            .main-wrapper {
+                flex-direction: column;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-wrapper">
+        <aside class="sidebar">
+            <div class="sidebar-title">
+                <div class="sidebar-logo"></div>
+                <h1>E-ZGuard</h1>
+                <button class="sidebar-docs-btn">docs</button>
+                <div class="sidebar-status-dot"></div>
+            </div>
+            <div class="toc">
+                <h2>Home</h2>
+                <ul>
+                    <li><a href="#introduction"> Introduction</a></li>
+                    <li><a href="#key-features">Key Features</a></li>
+                </ul>
+                
+                <h2>Installation & Setup</h2>
+                <ul>
+                    <li><a href="#prerequisites">Pre-requisites</a></li>
+                    <li><a href="#environment-setup">Configure Environment</a></li>
+                    <li><a href="#gcp-configuration">Google Cloud Platform Configuration</a></li>
+                    <li><a href="#docker-setup">Docker</a></li>
+                    <li><a href="#airflow-setup">Airflow</a></li>
+                    <li><a href="#dbt-setup">dbt</a></li>
+                    <li><a href="#frontend-setup">Frontend</a></li>
+                    <li><a href="#backend-setup">Backend</a></li>
+                    <li><a href="#verification">Verification & Testing</a></li>
+                    <li><a href="#troubleshooting">Troubleshooting</a></li>
+                </ul>
+                
+                <h2>API Reference</h2>
+                <ul>
+                    <li><a href="#api-overview">Overview</a></li>
+                    <li><a href="#api-authentication">Authentication</a></li>
+                    <li><a href="#api-transactions">Transactions</a></li>
+                    <li><a href="#api-metrics">Metrics</a></li>
+                    <li><a href="#api-charts">Charts</a></li>
+                    <li><a href="#api-status">Status Management</a></li>
+                    <li><a href="#api-table-info">Table Information</a></li>
+                </ul>
+            </div>
+        </aside>
+        
+        <main class="content">
+            <section id="introduction">
+                <h1>E-ZGuard: E-ZPass Fraud Detection System</h1>
+                
+                <p>E-ZGuard is a fraud detection and analytics platform designed to identify suspicious activity within E-ZPass toll transaction data. Built for the New Jersey Courts system, it combines machine learning, automated data pipelines, and an intuitive dashboard to help investigators detect anomalies quickly and accurately.</p>
+                
+                <h2 id="key-features">Key Features</h2>
+                
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon"><div class="icon-search"></div></div>
+                        <h3>Fraud Detection</h3>
+                        <p>E-ZGuard uses machine learning models (Isolation Forest) to automatically identify anomalous transaction patterns that may indicate fraudulent activity. The system analyzes multiple features including transaction timing, location patterns, and behavioral anomalies.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon"><div class="icon-lightning"></div></div>
+                        <h3>Real-Time Data Processing</h3>
+                        <p>E-ZGuard processes raw E-ZPass data through an automated pipeline that ingests CSV files into Google Cloud Storage, transforms and enriches them with dbt models, and applies trained machine learning models to generate fraud scores as new data arrives.</p>
+                        
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon"><div class="icon-chart"><span></span></div></div>
+                        <h3>Interactive Dashboard</h3>
+                        <p>The dashboard gives authorized users a clear view of fraud alerts and suspicious activity, supports anomaly-score analysis and trend monitoring, allows quick filtering and search of transactions, and provides secure access through Microsoft 365 (Azure AD) authentication.</p>
+                        
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon"><div class="icon-cloud"></div></div>
+                        <h3>Scalable Architecture</h3>
+                        <p>The system uses Google Cloud Storage for secure data ingestion and archival, BigQuery for fast analytical queries, and Vertex AI to train and deploy machine learning models. Workflow automation is managed through Apache Airflow, while dbt handles data transformation and modeling within the warehouse.</p>
+                        
+                    </div>
+                </div>
+                
+                <!-- <h2>Key Features</h2>
+                    
+                    <h3>1. Automated Fraud Detection</h3>
+                    <p>E-ZGuard uses machine learning models (Isolation Forest) to automatically identify anomalous transaction patterns that may indicate fraudulent activity. The system analyzes multiple features including transaction timing, location patterns, and behavioral anomalies.</p>
+                    
+                    <h3>2. Real-Time Data Processing</h3>
+                    <p>The platform processes raw E-ZPass transaction data through a multi-stage pipeline:</p>
+                    <ul>
+                        <li><strong>Data Ingestion:</strong> Automated upload of CSV files to Google Cloud Storage</li>
+                        <li><strong>Data Transformation:</strong> ETL pipelines using Apache Airflow and dbt</li>
+                        <li><strong>Feature Engineering:</strong> Advanced feature creation for ML model training</li>
+                        <li><strong>Model Training:</strong> Automated ML model training on Vertex AI</li>
+                        <li><strong>Prediction Generation:</strong> Real-time fraud predictions and anomaly scoring</li>
+                    </ul>
+                    
+                    <h3>3. Interactive Dashboard</h3>
+                    <p>A modern web-based dashboard provides authorized users with:</p>
+                    <ul>
+                        <li>Visualization of fraud alerts and suspicious transactions</li>
+                        <li>Anomaly score analysis and trend monitoring</li>
+                        <li>Transaction filtering and search capabilities</li>
+                        <li>Secure authentication via Microsoft 365 (Azure AD)</li>
+                    </ul>
+                    
+                    <h3>4. Scalable Architecture</h3>
+                    <p>Built on Google Cloud Platform, E-ZGuard leverages:</p>
+                    <ul>
+                        <li><strong>Google Cloud Storage (GCS):</strong> Secure data storage and archival</li>
+                        <li><strong>BigQuery:</strong> High-performance data warehousing and analytics</li>
+                        <li><strong>Vertex AI:</strong> Machine learning model training and deployment</li>
+                        <li><strong>Apache Airflow:</strong> Workflow orchestration and pipeline management</li>
+                        <li><strong>dbt:</strong> Data transformation and modeling</li>
+                    </ul>
+                    
+                    <h2>System Architecture</h2>
+                    <p>E-ZGuard follows a modular, containerized architecture:</p>
+                    <ul>
+                        <li><strong>Frontend:</strong> React-based dashboard with secure authentication</li>
+                        <li><strong>Backend:</strong> Python Flask API for data access and querying</li>
+                        <li><strong>Data Pipeline:</strong> Airflow DAGs for automated data processing</li>
+                        <li><strong>ML Pipeline:</strong> Vertex AI-based model training and inference</li>
+                        <li><strong>Data Warehouse:</strong> BigQuery for structured data storage and analytics</li>
+                    </ul>
+                    
+                    <h2>Business Values</h2>
+                    
+                    <h3>Saves 90% Review Time</h3>
+                    <p>Our pipeline processes <strong>18,000+</strong> E-ZPass transactions in under 20 minutes, dramatically reducing the time required for manual review and investigation.</p>
+                    
+                    <h3>Reduces Error</h3>
+                    <p>Flags <strong>~1%</strong> of records as anomalies using Isolation Forest (typically used for anomaly detection) and provides Fraud Scores & Risk Levels to help prioritize investigations and reduce false positives.</p>
+                    
+                    <h3>Detects Patterns Human Miss</h3>
+                    <p>The model evaluates <strong>30+</strong> engineered features including impossible travel speeds and route inconsistencies, identifying subtle patterns that may be missed during manual review.</p>
+                    
+                    <h2>Getting Started</h2>
+                    <p>To begin using E-ZGuard, follow the installation and setup instructions in the <a href="#prerequisites">Installation & Setup</a> section. The system requires:</p>
+                    <ul>
+                        <li>Docker and Docker Compose for containerized services</li>
+                        <li>Google Cloud Platform account with appropriate permissions</li>
+                        <li>Service account credentials for GCP access</li>
+                        <li>Environment variables configured for your deployment</li>
+                    </ul>
+                    
+                    <div class="info">
+                        <strong>Note:</strong> E-ZGuard is designed for use by authorized personnel within the New Jersey Courts system. All access is secured through Microsoft 365 authentication.
+                    </div> -->
+                </section>
+            
+            <div class="container">
+                <section id="prerequisites">
+            <h2>Prerequisites</h2>
+            
+            <h3>Required Software</h3>
+            <ol class="steps">
+                <li class="step">
+                    <strong>Docker & Docker Compose</strong>
+                    <p>Install Docker Desktop or Docker Engine with Docker Compose:</p>
+                    <ul>
+                        <li><strong>macOS:</strong> Download from <a href="https://www.docker.com/products/docker-desktop" target="_blank">docker.com</a></li>
+                        <li><strong>Linux:</strong> Follow <a href="https://docs.docker.com/engine/install/" target="_blank">Docker installation guide</a></li>
+                        <li><strong>Windows:</strong> Download Docker Desktop from <a href="https://www.docker.com/products/docker-desktop" target="_blank">docker.com</a></li>
+                    </ul>
+                    <div class="command">docker --version</div>
+                    <div class="command">docker-compose --version</div>
+                </li>
+                
+                <li class="step">
+                    <strong>Python 3.10+</strong>
+                    <p>Required for local development and scripts:</p>
+                    <div class="command">python3 --version</div>
+                </li>
+                
+                <li class="step">
+                    <strong>Node.js 16+ and npm</strong>
+                    <p>Required for frontend development:</p>
+                    <div class="command">node --version</div>
+                    <div class="command">npm --version</div>
+                </li>
+                
+                <li class="step">
+                    <strong>Git</strong>
+                    <p>For version control:</p>
+                    <div class="command">git --version</div>
+                </li>
+            </ol>
+            
+            <h3>Google Cloud Platform Account</h3>
+            <div class="info">
+                <strong>Required:</strong> You need a GCP account with the following services enabled:
+                <ul>
+                    <li>Google Cloud Storage (GCS)</li>
+                    <li>BigQuery</li>
+                    <li>Vertex AI</li>
+                </ul>
+            </div>
+        </section>
+        
+        <section id="environment-setup">
+            <h2>Configure Environment</h2>
+            
+            <h3>1. Clone the Repository</h3>
+            <div class="command">git clone &lt;repository-url&gt;</div>
+            <div class="command">cd E-ZPass-Fraud-Detection</div>
+            
+            <h3>2. Create Environment File</h3>
+            <p>Copy the template and fill in your values:</p>
+            <div class="command">cp env.template .env</div>
+            
+            <h3>3. Configure Environment Variables</h3>
+            <p>Edit the <code>.env</code> file with your configuration:</p>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Variable</th>
+                        <th>Description</th>
+                        <th>Required</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>GCS_BUCKET_NAME</code></td>
+                        <td>Your Google Cloud Storage bucket name</td>
+                        <td><span class="badge badge-required">Required</span></td>
+                    </tr>
+                    <tr>
+                        <td><code>GCS_PROJECT_ID</code></td>
+                        <td>Your GCP project ID</td>
+                        <td><span class="badge badge-required">Required</span></td>
+                    </tr>
+                    <tr>
+                        <td><code>BIGQUERY_DATASET</code></td>
+                        <td>BigQuery dataset name (default: ezpass_data)</td>
+                        <td><span class="badge badge-optional">Optional</span></td>
+                    </tr>
+                    <tr>
+                        <td><code>BIGQUERY_RAW_TABLE</code></td>
+                        <td>Raw data table name (default: bronze)</td>
+                        <td><span class="badge badge-optional">Optional</span></td>
+                    </tr>
+                    <tr>
+                        <td><code>GCS_FOLDER_PREFIX_RAW</code></td>
+                        <td>GCS folder prefix for raw data (default: data/raw/)</td>
+                        <td><span class="badge badge-optional">Optional</span></td>
+                    </tr>
+                    <tr>
+                        <td><code>AIRFLOW_EMAIL</code></td>
+                        <td>Email for Airflow notifications</td>
+                        <td><span class="badge badge-optional">Optional</span></td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div class="warning">
+                <strong>Important:</strong> Never commit the <code>.env</code> file to version control. It contains sensitive credentials.
+            </div>
+        </section>
+        
+        <section id="gcp-configuration">
+            <h2>Google Cloud Platform Configuration</h2>
+            
+            <h3>1. Create GCP Project</h3>
+            <ol class="steps">
+                <li class="step">
+                    Go to <a href="https://console.cloud.google.com" target="_blank">Google Cloud Console</a>
+                </li>
+                <li class="step">
+                    Create a new project or select an existing one
+                </li>
+                <li class="step">
+                    Copy your Project ID for later assignment to <code>GCS_PROJECT_ID</code>
+                </li>
+            </ol>
+            
+            <h3>2. Enable Required APIs</h3>
+            <p>Enable the following APIs in your GCP project:</p>
+            <ul>
+                <li>Cloud Storage API</li>
+                <li>BigQuery API</li>
+                <li>Vertex AI API</li>
+            </ul>
+            <div class="command">gcloud services enable storage.googleapis.com bigquery.googleapis.com aiplatform.googleapis.com</div>
+            
+            <h3>3. Create Service Account</h3>
+            <ol class="steps">
+                <li class="step">
+                    Navigate to <strong>IAM & Admin → Service Accounts</strong>
+                </li>
+                <li class="step">
+                    Click <strong>Create Service Account</strong>
+                </li>
+                <li class="step">
+                    Name it (e.g., <code>ezpass-airflow</code>) and grant roles:
+                    <ul>
+                        <li><code>Storage Admin</code> (for GCS)</li>
+                        <li><code>BigQuery Admin</code> (for BigQuery)</li>
+                        <li><code>Vertex AI User</code> (for ML training)</li>
+                    </ul>
+                </li>
+                <li class="step">
+                    Create and download a JSON key file
+                </li>
+            </ol>
+            
+            <h3>4. Configure Service Account Key</h3>
+            <p>Place the service account JSON key in the Airflow config directory:</p>
+            <div class="command">cp /path/to/your-service-account-key.json src/airflow/config/gcp-key.json</div>
+            
+            <div class="warning">
+                <strong>Security:</strong> Ensure <code>src/airflow/config/gcp-key.json</code> is in <code>.gitignore</code> and never committed to the repository.
+            </div>
+            
+            <h3>5. Create GCS Bucket</h3>
+            <div class="command">gsutil mb -p &lt;PROJECT_ID&gt; -l us-central1 gs://&lt;BUCKET_NAME&gt;</div>
+            <p>Or use the Cloud Console to create a bucket and use its name in <code>GCS_BUCKET_NAME</code>.</p>
+            
+            <h3>6. Create BigQuery Dataset</h3>
+            <div class="command">bq mk --dataset --location=US &lt;PROJECT_ID&gt;:ezpass_data</div>
+            <p>Or create it via the BigQuery console.</p>
+        </section>
+        
+        <section id="docker-setup">
+            <h2>Docker</h2>
+            
+            <h3>1. Build Docker Images</h3>
+            <p>The Dockerfile will build an Airflow image with all required dependencies:</p>
+            <div class="command">docker-compose build</div>
+            
+            <div class="info">
+                <strong>Note:</strong> The first build may take several minutes as it installs:
+                <ul>
+                    <li>Apache Airflow 2.7.0</li>
+                    <li>Google Cloud providers</li>
+                    <li>dbt-core and dbt-bigquery</li>
+                    <li>ML libraries (scikit-learn, pandas, numpy)</li>
+                </ul>
+            </div>
+            
+            <h3>2. Initialize Airflow Database</h3>
+            <div class="command">docker-compose up airflow-init</div>
+            
+            <div class="success">
+                <strong>Success:</strong> You should see "User 'airflow' created with role 'Admin'" when initialization completes.
+            </div>
+            
+            <h3>3. Start Services</h3>
+            <div class="command">docker-compose up -d</div>
+            
+            <p>This will start:</p>
+            <ul>
+                <li>PostgreSQL database</li>
+                <li>Airflow webserver (port 8080)</li>
+                <li>Airflow scheduler</li>
+                <li>Redis (if using Celery executor)</li>
+            </ul>
+            
+            <h3>4. Verify Services</h3>
+            <div class="command">docker-compose ps</div>
+            <p>All services should show as "Up" or "healthy".</p>
+        </section>
+        
+        <section id="airflow-setup">
+            <h2>Airflow</h2>
+            
+            <h3>1. Access Airflow Web UI</h3>
+            <p>Open your browser and navigate to:</p>
+            <div class="info">
+                <strong>URL:</strong> <a href="http://localhost:8080" target="_blank">http://localhost:8080</a><br>
+                <strong>Username:</strong> airflow<br>
+                <strong>Password:</strong> airflow
+            </div>
+            
+            <h3>2. Verify DAGs</h3>
+            <p>You should see the following DAGs in the Airflow UI:</p>
+            <ul style="list-style: none; padding-left: 0;">
+                <li style="list-style: none;"><code>master_pipeline</code>: Main orchestration DAG. This executes the following modular DAGs:
+                  <ul style="list-style: disc; padding-left: 20px;">
+                    <li style="color: #1a1a1a;"><code>gcs_upload_raw</code>: Uploads raw CSV files to GCS</li>
+                    <li style="color: #1a1a1a;"><code>gcs_to_bigquery_pipeline</code>: Loads data from GCS to BigQuery</li>
+                    <li style="color: #1a1a1a;"><code>dbt_pipeline</code>: Runs dbt transformations</li>
+                    <li style="color: #1a1a1a;"><code>model_training</code>: ML model training pipeline</li>
+                  </ul>
+                </li>
+            </ul>
+            
+            <h3>3. Configure dbt Profiles</h3>
+            <p>Ensure <code>src/airflow/config/profiles.yml</code> is configured correctly:</p>
+            <code>ezpass_dbt:
+  outputs:
+    dev:
+      type: bigquery
+      method: service-account
+      project: &lt;YOUR_PROJECT_ID&gt;
+      dataset: ezpass_data
+      keyfile: /opt/airflow/config/gcp-key.json
+      location: US
+      priority: interactive
+  target: dev</code>
+            
+            <h3>4. Test Pipeline Execution</h3>
+            <ol class="steps">
+                <li class="step">
+                    Place CSV files in <code>data/raw/</code> directory
+                </li>
+                <li class="step">
+                    In Airflow UI, trigger the <code>master_pipeline</code> DAG
+                </li>
+                <li class="step">
+                    Monitor the execution in the Airflow UI
+                </li>
+            </ol>
+        </section>
+        
+        <section id="dbt-setup">
+            <h2>dbt</h2>
+            
+            <h3>1. Verify dbt Project Structure</h3>
+            <p>The dbt project is located at <code>ezpass_dbt/</code> with the following structure:</p>
+            <ul>
+                <li><code>models/bronze/</code> - Raw data models</li>
+                <li><code>models/silver/</code> - Cleaned and enriched data</li>
+                <li><code>models/gold/</code> - Aggregated and flagged data</li>
+                <li><code>models/gold-train/</code> - Training features</li>
+                <li><code>models/viz-master/</code> - Master visualization table</li>
+                <li><code>models/viz-prediction/</code> - Prediction results</li>
+            </ul>
+            
+            <h3>2. Install dbt Dependencies</h3>
+            <p>Dependencies are automatically installed by the <code>dbt_pipeline</code> DAG, but you can test locally:</p>
+            <div class="command">cd ezpass_dbt</div>
+            <div class="command">dbt deps --profiles-dir ../src/airflow/config</div>
+            
+            <h3>3. Test dbt Connection</h3>
+            <div class="command">dbt debug --profiles-dir ../src/airflow/config</div>
+            
+            <div class="success">
+                <strong>Success:</strong> All checks should pass, including BigQuery connection.
+            </div>
+        </section>
+        
+        <section id="frontend-setup">
+            <h2>Frontend</h2>
+            
+            <h3>1. Install Dependencies</h3>
+            <div class="command">cd frontend</div>
+            <div class="command">npm install</div>
+            
+            <h3>2. Configure API Endpoint</h3>
+            <p>Update the API URL in <code>frontend/src/App.js</code> if needed:</p>
+            <div class="command">const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';</div>
+            
+            <h3>3. Start Development Server</h3>
+            <div class="command">npm start</div>
+            <p>The frontend will be available at <a href="http://localhost:3000" target="_blank">http://localhost:3000</a></p>
+            
+            <h3>4. Build for Production</h3>
+            <div class="command">npm run build</div>
+        </section>
+        
+        <section id="backend-setup">
+            <h2>Backend</h2>
+            
+            <h3>1. Create Virtual Environment</h3>
+            <div class="command">python3 -m venv venv</div>
+            <div class="command">source venv/bin/activate  # On Windows: venv\Scripts\activate</div>
+            
+            <h3>2. Install Dependencies</h3>
+            <div class="command">pip install -r requirements.txt</div>
+            <div class="command">pip install -r backend/requirements.txt</div>
+            
+            <h3>3. Configure Backend</h3>
+            <p>Ensure BigQuery credentials are set up in <code>backend/keys/bigquery.json</code></p>
+            
+            <h3>4. Start Backend Server</h3>
+            <div class="command">cd backend</div>
+            <div class="command">python app.py</div>
+            <p>The backend API will be available at <a href="http://localhost:5000" target="_blank">http://localhost:5000</a></p>
+        </section>
+        
+        <section id="verification">
+            <h2>Verification & Testing</h2>
+            
+            <h3>1. Verify Docker Services</h3>
+            <div class="command">docker-compose ps</div>
+            <p>All services should be running.</p>
+            
+            <h3>2. Test Airflow Connection</h3>
+            <ul>
+                <li>Access Airflow UI at <code>http://localhost:8080</code></li>
+                <li>Verify all DAGs are visible and not paused</li>
+                <li>Check for any import errors in DAG definitions</li>
+            </ul>
+            
+            <h3>3. Test GCS Connection</h3>
+            <div class="command">docker-compose exec airflow-webserver python -c "from google.cloud import storage; client = storage.Client(); print('GCS connection successful')"</div>
+            
+            <h3>4. Test BigQuery Connection</h3>
+            <div class="command">docker-compose exec airflow-webserver python -c "from google.cloud import bigquery; client = bigquery.Client(); print('BigQuery connection successful')"</div>
+            
+            <h3>5. Test dbt Connection</h3>
+            <div class="command">docker-compose exec airflow-webserver dbt debug --profiles-dir /opt/airflow/config</div>
+            
+            <h3>6. Run End-to-End Test</h3>
+            <ol class="steps">
+                <li class="step">
+                    Place a test CSV file in <code>data/raw/</code>
+                </li>
+                <li class="step">
+                    Trigger the <code>master_pipeline</code> DAG in Airflow
+                </li>
+                <li class="step">
+                    Monitor execution and verify:
+                    <ul>
+                        <li>File is uploaded to GCS</li>
+                        <li>Data is loaded to BigQuery</li>
+                        <li>dbt models run successfully</li>
+                        <li>No errors in logs</li>
+                    </ul>
+                </li>
+            </ol>
+        </section>
+        
+        <section id="troubleshooting">
+            <h2>Troubleshooting</h2>
+            
+            <h3>Common Issues</h3>
+            
+            <h4>Docker Build Fails</h4>
+            <ul>
+                <li>Ensure Docker has enough resources (4GB+ RAM recommended)</li>
+                <li>Check internet connection for package downloads</li>
+                <li>Try clearing Docker cache: <code>docker system prune -a</code></li>
+            </ul>
+            
+            <h4>Airflow DAGs Not Appearing</h4>
+            <ul>
+                <li>Check DAG files are in <code>src/airflow/dags/</code></li>
+                <li>Verify no Python syntax errors: <code>docker-compose logs airflow-webserver</code></li>
+                <li>Ensure DAGs are not paused (check in Airflow UI)</li>
+            </ul>
+            
+            <h4>GCS/BigQuery Authentication Errors</h4>
+            <ul>
+                <li>Verify <code>gcp-key.json</code> exists in <code>src/airflow/config/</code></li>
+                <li>Check service account has required permissions</li>
+                <li>Verify <code>GOOGLE_APPLICATION_CREDENTIALS</code> environment variable</li>
+            </ul>
+            
+            <h4>dbt Connection Issues</h4>
+            <ul>
+                <li>Verify <code>profiles.yml</code> configuration</li>
+                <li>Check BigQuery dataset exists</li>
+                <li>Run <code>dbt debug</code> to diagnose issues</li>
+            </ul>
+            
+            <h4>Port Conflicts</h4>
+            <ul>
+                <li>Check if ports 8080, 5000, or 3000 are already in use</li>
+                <li>Modify ports in <code>docker-compose.yaml</code> if needed</li>
+            </ul>
+            
+            <h3>Viewing Logs</h3>
+            <div class="command">docker-compose logs airflow-webserver</div>
+            <div class="command">docker-compose logs airflow-scheduler</div>
+            <div class="command">docker-compose logs -f  # Follow all logs</div>
+            
+            <h3>Restarting Services</h3>
+            <div class="command">docker-compose restart</div>
+            <div class="command">docker-compose down && docker-compose up -d  # Full restart            </div>
+        </section>
+        
+        <section id="api-overview">
+            <h2>API Reference</h2>
+            
+            <h3>Overview</h3>
+            <p>The E-ZGuard API provides a RESTful interface for accessing transaction data, metrics, and fraud detection results. The API is built with Flask and connects to BigQuery for data retrieval.</p>
+            
+            <div class="info">
+                <strong>Base URL:</strong> <code>http://localhost:5000</code> (development) or your production URL<br>
+                <strong>Content-Type:</strong> <code>application/json</code><br>
+                <strong>Response Format:</strong> All responses are JSON objects
+            </div>
+            
+            <h3>Table Support</h3>
+            <p>The API supports two table configurations controlled by the <code>BIGQUERY_TABLE</code> environment variable:</p>
+            <ul>
+                <li><code>master_viz</code> - Master visualization table with ML predictions</li>
+                <li><code>gold_automation</code> - Rule-based automation table</li>
+            </ul>
+            <p>Endpoints automatically adapt their queries based on the configured table.</p>
+        </section>
+        
+        <section id="api-authentication">
+            <h2>Authentication</h2>
+            
+            <p>Currently, the API does not require authentication tokens. However, access should be restricted at the network level or through a reverse proxy in production environments.</p>
+            
+            <div class="warning">
+                <strong>Security Note:</strong> For production deployments, implement proper authentication (e.g., API keys, OAuth2, or JWT tokens) and ensure HTTPS is enabled.
+            </div>
+        </section>
+        
+        <section id="api-transactions">
+            <h2>Transactions</h2>
+            
+            <h3>Get All Transactions</h3>
+            <p>Retrieve paginated transaction data with optional filtering and search capabilities.</p>
+            
+            <h4>Endpoint</h4>
+            <code>GET /api/transactions</code>
+            
+            <h4>Query Parameters</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                        <th>Required</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>page</code></td>
+                        <td>integer</td>
+                        <td>Page number (default: 1)</td>
+                        <td><span class="badge badge-optional">Optional</span></td>
+                    </tr>
+                    <tr>
+                        <td><code>limit</code></td>
+                        <td>integer</td>
+                        <td>Number of records per page (default: 50)</td>
+                        <td><span class="badge badge-optional">Optional</span></td>
+                    </tr>
+                    <tr>
+                        <td><code>search</code></td>
+                        <td>string</td>
+                        <td>Search in transaction_id, tag_plate_number, or category</td>
+                        <td><span class="badge badge-optional">Optional</span></td>
+                    </tr>
+                    <tr>
+                        <td><code>status</code></td>
+                        <td>string</td>
+                        <td>Filter by status (e.g., "Needs Review", "Investigating")</td>
+                        <td><span class="badge badge-optional">Optional</span></td>
+                    </tr>
+                    <tr>
+                        <td><code>category</code></td>
+                        <td>string</td>
+                        <td>Filter by ML category or threat severity</td>
+                        <td><span class="badge badge-optional">Optional</span></td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <h4>Example Request</h4>
+            <code>GET /api/transactions?page=1&limit=50&search=ABC123&status=Needs Review</code>
+            
+            <h4>Example Response</h4>
+            <code>{
+  "data": [
+    {
+      "transaction_id": 12345,
+      "transaction_date": "2025-01-15",
+      "tag_plate_number": "ABC123",
+      "agency": "NJTA",
+      "amount": 12.50,
+      "status": "Needs Review",
+      "ml_predicted_category": "High Risk",
+      "is_anomaly": 1
+    }
+  ],
+  "page": 1,
+  "limit": 50
+}</code>
+            
+            <h3>Get Transaction Count</h3>
+            <p>Get the total count of transactions matching the specified filters.</p>
+            
+            <h4>Endpoint</h4>
+            <code>GET /api/transactions/count</code>
+            
+            <h4>Query Parameters</h4>
+            <p>Same as <code>GET /api/transactions</code> (search, status, category)</p>
+            
+            <h4>Example Response</h4>
+            <code>{
+  "total": 1250
+}</code>
+            
+            <h3>Get Alerts</h3>
+            <p>Retrieve flagged or investigating transactions (recent alerts).</p>
+            
+            <h4>Endpoint</h4>
+            <code>GET /api/transactions/alerts</code>
+            
+            <h4>Example Response</h4>
+            <code>{
+  "data": [
+    {
+      "transaction_id": 12345,
+      "transaction_date": "2025-01-15",
+      "is_anomaly": 1,
+      "ml_predicted_category": "Critical Risk"
+    }
+  ]
+}</code>
+            
+            <h3>Get Recent Flagged Transactions</h3>
+            <p>Get the 3 most recent flagged transactions for homepage display.</p>
+            
+            <h4>Endpoint</h4>
+            <code>GET /api/transactions/recent-flagged</code>
+            
+            <h4>Example Response</h4>
+            <code>{
+  "data": [
+    {
+      "id": 12345,
+      "transaction_id": 12345,
+      "transaction_date": "2025-01-15",
+      "tag_plate_number": "ABC123",
+      "agency": "NJTA",
+      "amount": 12.50,
+      "status": "Needs Review",
+      "category": "High Risk",
+      "is_anomaly": true
+    }
+  ]
+}</code>
+        </section>
+        
+        <section id="api-metrics">
+            <h2>Metrics</h2>
+            
+            <h3>Get Dashboard Metrics</h3>
+            <p>Retrieve aggregated metrics for dashboard cards including total transactions, flagged counts, and financial summaries.</p>
+            
+            <h4>Endpoint</h4>
+            <code>GET /api/metrics</code>
+            
+            <h4>Example Response</h4>
+            <code>{
+  "total_transactions": 50000,
+  "total_flagged": 500,
+  "total_amount": 6250.00,
+  "total_alerts_ytd": 450,
+  "detected_frauds_current_month": 25,
+  "potential_loss_ytd": 5625.00
+}</code>
+            
+            <h4>Response Fields</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Field</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>total_transactions</code></td>
+                        <td>integer</td>
+                        <td>Total number of transactions in the system</td>
+                    </tr>
+                    <tr>
+                        <td><code>total_flagged</code></td>
+                        <td>integer</td>
+                        <td>Total number of flagged/anomalous transactions</td>
+                    </tr>
+                    <tr>
+                        <td><code>total_amount</code></td>
+                        <td>float</td>
+                        <td>Total amount of all flagged transactions</td>
+                    </tr>
+                    <tr>
+                        <td><code>total_alerts_ytd</code></td>
+                        <td>integer</td>
+                        <td>Number of alerts in the current year</td>
+                    </tr>
+                    <tr>
+                        <td><code>detected_frauds_current_month</code></td>
+                        <td>integer</td>
+                        <td>High/Critical risk transactions in current month</td>
+                    </tr>
+                    <tr>
+                        <td><code>potential_loss_ytd</code></td>
+                        <td>float</td>
+                        <td>Total potential loss from flagged transactions this year</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        
+        <section id="api-charts">
+            <h2>Charts</h2>
+            
+            <h3>Get Category Chart Data</h3>
+            <p>Retrieve fraud counts grouped by category/flag type for pie or bar charts.</p>
+            
+            <h4>Endpoint</h4>
+            <code>GET /api/charts/category</code>
+            
+            <h4>Example Response</h4>
+            <code>{
+  "data": [
+    {
+      "category": "Rush Hour",
+      "count": 150
+    },
+    {
+      "category": "Weekend",
+      "count": 120
+    },
+    {
+      "category": "Amount Unusually High",
+      "count": 80
+    }
+  ]
+}</code>
+            
+            <h3>Get Severity Chart Data</h3>
+            <p>Retrieve transaction counts grouped by threat severity or ML predicted category.</p>
+            
+            <h4>Endpoint</h4>
+            <code>GET /api/charts/severity</code>
+            
+            <h4>Example Response</h4>
+            <code>{
+  "data": [
+    {
+      "severity": "Critical Risk",
+      "count": 50
+    },
+    {
+      "severity": "High Risk",
+      "count": 200
+    },
+    {
+      "severity": "Medium Risk",
+      "count": 250
+    }
+  ]
+}</code>
+            
+            <h3>Get Monthly Chart Data</h3>
+            <p>Retrieve monthly transaction and fraud alert counts for the last 12 months.</p>
+            
+            <h4>Endpoint</h4>
+            <code>GET /api/charts/monthly</code>
+            
+            <h4>Example Response</h4>
+            <code>{
+  "data": [
+    {
+      "month": "Jan 2025",
+      "year": 2025,
+      "month_num": 1,
+      "total_transactions": 5000,
+      "fraud_alerts": 50
+    },
+    {
+      "month": "Feb 2025",
+      "year": 2025,
+      "month_num": 2,
+      "total_transactions": 4800,
+      "fraud_alerts": 45
+    }
+  ]
+}</code>
+            
+            <h3>Get Scatter Chart Data</h3>
+            <p>Retrieve data for scatter plot visualization of anomaly scores vs transaction amounts.</p>
+            
+            <h4>Endpoint</h4>
+            <code>GET /api/charts/scatter</code>
+            
+            <h4>Example Response</h4>
+            <code>{
+  "data": [
+    {
+      "amount": 12.50,
+      "ml_anomaly_score": 0.85,
+      "risk_level": "High Risk"
+    },
+    {
+      "amount": 8.25,
+      "ml_anomaly_score": 0.45,
+      "risk_level": "Low Risk"
+    }
+  ]
+}</code>
+            
+            <h3>Get Time Series Chart Data</h3>
+            <p>Retrieve fraud counts grouped by hour of day for time series analysis.</p>
+            
+            <h4>Endpoint</h4>
+            <code>GET /api/charts/timeseries</code>
+            
+            <h4>Example Response</h4>
+            <code>{
+  "data": [
+    {
+      "hour": 0,
+      "fraud_count": 5
+    },
+    {
+      "hour": 1,
+      "fraud_count": 3
+    },
+    {
+      "hour": 8,
+      "fraud_count": 25
+    }
+  ]
+}</code>
+        </section>
+        
+        <section id="api-status">
+            <h2>Status Management</h2>
+            
+            <h3>Update Transaction Status</h3>
+            <p>Update the status of a transaction with validation of allowed status transitions.</p>
+            
+            <h4>Endpoint</h4>
+            <code>POST /api/transactions/update-status</code>
+            
+            <h4>Request Body</h4>
+            <code>{
+  "transactionId": 12345,
+  "newStatus": "Investigating"
+}</code>
+            
+            <h4>Status Transitions</h4>
+            <p>The API enforces the following status transition rules:</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Current Status</th>
+                        <th>Allowed Transitions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>No Action Required</code></td>
+                        <td>None (terminal state)</td>
+                    </tr>
+                    <tr>
+                        <td><code>Needs Review</code></td>
+                        <td>Resolved - Not Fraud, Investigating, Resolved - Fraud</td>
+                    </tr>
+                    <tr>
+                        <td><code>Investigating</code></td>
+                        <td>Resolved - Not Fraud, Resolved - Fraud</td>
+                    </tr>
+                    <tr>
+                        <td><code>Resolved - Not Fraud</code></td>
+                        <td>None (terminal state)</td>
+                    </tr>
+                    <tr>
+                        <td><code>Resolved - Fraud</code></td>
+                        <td>None (terminal state)</td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <h4>Example Response (Success)</h4>
+            <code>{
+  "success": true
+}</code>
+            
+            <h4>Example Response (Error - Invalid Transition)</h4>
+            <code>{
+  "error": "Invalid status transition",
+  "current_status": "No Action Required",
+  "new_status": "Investigating",
+  "allowed": []
+}</code>
+            
+            <h4>Error Responses</h4>
+            <ul>
+                <li><code>400 Bad Request</code> - Missing transactionId or newStatus</li>
+                <li><code>400 Bad Request</code> - Invalid status transition</li>
+                <li><code>404 Not Found</code> - Transaction not found</li>
+                <li><code>500 Internal Server Error</code> - Server error</li>
+            </ul>
+        </section>
+        
+        <section id="api-table-info">
+            <h2>Table Information</h2>
+            
+            <h3>Get Table Information</h3>
+            <p>Retrieve information about the currently configured BigQuery table.</p>
+            
+            <h4>Endpoint</h4>
+            <code>GET /api/table-info</code>
+            
+            <h4>Example Response</h4>
+            <code>{
+  "table_name": "master_viz",
+  "is_master_viz": true,
+  "is_gold_automation": false
+}</code>
+            
+            <h4>Response Fields</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Field</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>table_name</code></td>
+                        <td>string</td>
+                        <td>Name of the currently configured table</td>
+                    </tr>
+                    <tr>
+                        <td><code>is_master_viz</code></td>
+                        <td>boolean</td>
+                        <td>True if using master_viz table</td>
+                    </tr>
+                    <tr>
+                        <td><code>is_gold_automation</code></td>
+                        <td>boolean</td>
+                        <td>True if using gold_automation table</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        
+        <section id="api-errors">
+            <h2>Error Handling</h2>
+            
+            <p>All API endpoints follow consistent error response patterns:</p>
+            
+            <h3>Error Response Format</h3>
+            <code>{
+  "error": "Error message description",
+  "data": []  // May be included for endpoints that return arrays
+}</code>
+            
+            <h3>HTTP Status Codes</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>200</code></td>
+                        <td>Success</td>
+                    </tr>
+                    <tr>
+                        <td><code>400</code></td>
+                        <td>Bad Request - Invalid parameters or invalid status transition</td>
+                    </tr>
+                    <tr>
+                        <td><code>404</code></td>
+                        <td>Not Found - Transaction or resource not found</td>
+                    </tr>
+                    <tr>
+                        <td><code>500</code></td>
+                        <td>Internal Server Error - Database or server error</td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <h3>Common Error Scenarios</h3>
+            <ul>
+                <li><strong>Database Connection Errors:</strong> Check BigQuery credentials and network connectivity</li>
+                <li><strong>Invalid Query Parameters:</strong> Verify parameter types and values match expected formats</li>
+                <li><strong>Table Not Found:</strong> Ensure the configured table exists in BigQuery</li>
+                <li><strong>SQL Injection Prevention:</strong> The API escapes single quotes in user inputs to prevent SQL injection</li>
+            </ul>
+        </section>
+            </div>
+        </main>
+    </div>
+    
+    <script>
+        // Add dropdown functionality to sidebar sections
+        document.addEventListener('DOMContentLoaded', function() {
+            const tocHeadings = document.querySelectorAll('.toc h2');
+            
+            tocHeadings.forEach(heading => {
+                // Sections start expanded by default (no collapsed class)
+                // Add click event listener
+                heading.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    this.classList.toggle('collapsed');
+                });
+            });
+        });
+    </script>
+    </body>
+</html>

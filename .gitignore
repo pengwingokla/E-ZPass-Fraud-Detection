@@ -2,6 +2,7 @@
 documents/**/*
 !documents/.gitkeep
 docs/
+!docs/setup-manual.html
 !backend/.gitkeep
 
 # Specific files to ignore
