@@ -9,6 +9,8 @@ E-ZGuard is an automated fraud detection and analytics platform designed to iden
 - **Interactive Dashboard**: Modern web-based dashboard with visualizations, filtering, and secure authentication
 - **Scalable Architecture**: Built on Google Cloud Platform with BigQuery, Vertex AI, Airflow, and dbt
 
+## Data Pipeline
+![EZPass Pipeline Diagram](./docs/ezpass-pipeline-diagram.png)
 ## Quick Start
 
 ### Prerequisites
@@ -114,3 +116,4 @@ _To be determined_
 - [API Reference](docs/setup-manual.html#api-overview)
 - [Google Slides](https://docs.google.com/presentation/d/1pgGwSzpV89Q9UtXA7dg9pa52v4l-0iMfACFaLnFE840/edit?usp=sharing)
 - [Project Documentation](https://drive.google.com/drive/folders/1k9JhQVRJAZEYMZTjLwgfGh1DHFsIAv2a?usp=sharing)
+
