@@ -2018,10 +2018,18 @@ export default function App() {
     const isAuthenticated = useIsAuthenticated();
 
    // --- MSAL Login / Logout Handlers (Redirect Version) ---
-const handleLogin = () => {
-    instance.loginRedirect(loginRequest).catch(err => {
+const handleLogin = async () => {
+    try {
+        console.log("Attempting to login with MSAL...");
+        console.log("Login request:", loginRequest);
+        console.log("MSAL instance:", instance);
+        
+        await instance.loginRedirect(loginRequest);
+        console.log("Login redirect initiated");
+    } catch (err) {
         console.error("MSAL login failed:", err);
-    });
+        alert("Login failed: " + (err.message || "Unknown error"));
+    }
 };
 
 const handleLogout = () => {
