@@ -2013,33 +2013,34 @@ export default function App() {
         }
         return false; // Default to light mode
     });
+    // Bypass authentication - track login state locally
+    const [isLoggedIn, setIsLoggedIn] = useState(() => {
+        // Check if user was previously logged in (bypass mode)
+        return localStorage.getItem('bypassLogin') === 'true';
+    });
 
     const { instance, accounts } = useMsal();
     const isAuthenticated = useIsAuthenticated();
+    // Use bypass login state instead of actual MSAL authentication
+    const effectiveAuth = isLoggedIn;
 
-   // --- MSAL Login / Logout Handlers (Redirect Version) ---
+   // --- Bypass Login / Logout Handlers ---
 const handleLogin = async () => {
-    try {
-        console.log("Attempting to login with MSAL...");
-        console.log("Login request:", loginRequest);
-        console.log("MSAL instance:", instance);
-        
-        await instance.loginRedirect(loginRequest);
-        console.log("Login redirect initiated");
-    } catch (err) {
-        console.error("MSAL login failed:", err);
-        alert("Login failed: " + (err.message || "Unknown error"));
-    }
+    // Bypass actual MSAL login - just set logged in state
+    console.log("Bypassing login - redirecting to dashboard");
+    setIsLoggedIn(true);
+    localStorage.setItem('bypassLogin', 'true');
 };
 
 const handleLogout = () => {
-    instance.logoutRedirect().catch(err => {
-        console.error("MSAL logout failed:", err);
-    });
+    // Reset bypass login state
+    setIsLoggedIn(false);
+    localStorage.removeItem('bypassLogin');
 };
 
 
-    const userName = accounts[0]?.name || accounts[0]?.username;
+    // Use a default username for bypass mode, or MSAL account if available
+    const userName = isLoggedIn ? (accounts[0]?.name || accounts[0]?.username || 'Demo User') : null;
 
     useEffect(() => {
         if (isDarkMode) {
@@ -2056,7 +2057,7 @@ const handleLogout = () => {
     };
 
     // --- Unauthenticated Login Screen ---
-    if (!isAuthenticated) {
+    if (!effectiveAuth) {
         return (
             <div className={`relative min-h-screen transition-colors duration-300 ${
                 isDarkMode 
