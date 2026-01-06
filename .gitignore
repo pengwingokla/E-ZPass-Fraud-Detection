@@ -385,3 +385,7 @@ backend/config/gcp-key.json
 **/gcp-key.json
 *.json.key
 service-account*.json
+
+# Startup files
+.airflow-init
+.docker-built

@@ -133,6 +133,9 @@ fi
 
 echo ""
 
+# Create logs directory if it doesn't exist
+mkdir -p logs
+
 # Check if ports are available
 echo -e "${YELLOW}Checking if ports are available...${NC}"
 
@@ -323,9 +326,6 @@ echo -e "  • Airflow:  docker-compose logs -f"
 echo ""
 echo -e "${YELLOW}To stop all services, press Ctrl+C or run ./stop.sh${NC}"
 echo ""
-
-# Create logs directory if it doesn't exist
-mkdir -p logs
 
 # Keep script running and wait for background processes
 # This allows Ctrl+C to trigger the cleanup trap
