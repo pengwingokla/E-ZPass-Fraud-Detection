@@ -1197,7 +1197,7 @@ const DataView = () => {
     };
 
     const [searchTerm, setSearchTerm] = useState('');
-    const [filterStatus, setFilterStatus] = useState('all');
+    const [filterStatus, setFilterStatus] = useState('Needs Review');
     const [filterMLCategory, setFilterMLCategory] = useState('all');
     const [sortColumn, setSortColumn] = useState(null);
     const [sortDirection, setSortDirection] = useState('asc'); // 'asc' or 'desc'
