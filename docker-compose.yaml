@@ -5,7 +5,7 @@ x-airflow-common:
   # Build from Dockerfile instead of using base image
   build:
     context: .
-    dockerfile: Dockerfile
+    dockerfile: Dockerfile.airflow
   image: ezpass-airflow:latest
   environment:
     &airflow-common-env

@@ -1,22 +1,55 @@
-FROM apache/airflow:2.7.0-python3.10
+# Multi-stage Dockerfile for all-in-one deployment
+# Builds frontend and serves it from Flask backend
 
-# Install Airflow Google provider first (includes many Google Cloud packages)
-RUN pip install --no-cache-dir \
-    apache-airflow-providers-google
+# Stage 1: Build React frontend
+FROM node:18-alpine AS frontend-builder
 
-# Install ML packages (only those not already included in providers)
-RUN pip install --no-cache-dir \
-    google-cloud-aiplatform>=1.38.0 \
-    scikit-learn>=1.3.0 \
-    pandas>=2.0.0 \
-    numpy>=1.24.0 \
-    joblib>=1.3.0
+WORKDIR /app
 
-# Upgrade protobuf to version 6.x for dbt-core compatibility
-# dbt-core requires protobuf>=6.0, but Google packages install 4.x
-RUN pip install --no-cache-dir --upgrade "protobuf>=6.0,<7.0"
+# Copy package files
+COPY frontend/package*.json ./
 
-# Install dbt and dbt-bigquery (requires protobuf>=6.0)
-RUN pip install --no-cache-dir \
-    dbt-core>=1.5.0 \
-    dbt-bigquery>=1.5.0
+# Install dependencies
+RUN npm ci
+
+# Copy frontend source
+COPY frontend/ .
+
+# Build React app (use empty API URL for relative paths)
+ARG REACT_APP_API_URL=
+ENV REACT_APP_API_URL=${REACT_APP_API_URL}
+RUN npm run build
+
+# Stage 2: Python backend with frontend
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy backend requirements
+COPY backend/requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install Gunicorn
+RUN pip install --no-cache-dir gunicorn
+
+# Copy backend code
+COPY backend/ .
+
+# Copy built frontend from builder stage
+COPY --from=frontend-builder /app/build ./static
+
+# Cloud Run uses PORT environment variable
+ENV PORT=8080
+
+# Expose port
+EXPOSE $PORT
+
+# Run Gunicorn
+CMD exec gunicorn --bind :$PORT --workers 2 --threads 4 --timeout 0 app:app
