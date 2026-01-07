@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from google.cloud import bigquery
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -24,7 +24,14 @@ with open(key_path, "w") as f:
 # Initialize BigQuery
 client = bigquery.Client.from_service_account_json(key_path)
 
-app = Flask(__name__)
+# Initialize Flask app
+# If static folder exists (from Docker build), serve frontend from there
+static_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+if os.path.exists(static_folder):
+    app = Flask(__name__, static_folder=static_folder, static_url_path='')
+else:
+    app = Flask(__name__)
+
 CORS(app)
 
 TABLE_NAME = os.getenv("BIGQUERY_TABLE", "master_viz")
@@ -663,6 +670,22 @@ def table_info():
         "is_gold_automation": TABLE_NAME == "gold_automation"
     })
 
+
+# Serve React app for all non-API routes (only if static folder exists)
+if os.path.exists(static_folder):
+    @app.route('/', defaults={'path': ''})
+    @app.route('/<path:path>')
+    def serve(path):
+        """Serve React app for all non-API routes"""
+        # Don't serve API routes as static files
+        if path.startswith('api/'):
+            return jsonify({"error": "Not found"}), 404
+        
+        # Serve index.html for all routes (React Router)
+        if path != "" and os.path.exists(os.path.join(static_folder, path)):
+            return send_from_directory(static_folder, path)
+        else:
+            return send_from_directory(static_folder, 'index.html')
 
 
 if __name__ == "__main__":

@@ -1,0 +1,45 @@
+# Cloud Build configuration for all-in-one deployment
+steps:
+  # Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/ezpass-app:latest'
+      - '.'
+
+  # Push to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/ezpass-app:latest'
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'ezpass-app'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/ezpass-app:latest'
+      - '--platform'
+      - 'managed'
+      - '--region'
+      - 'us-central1'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '1Gi'
+      - '--timeout'
+      - '300'
+      - '--set-env-vars'
+      - 'BIGQUERY_DATASET=ezpass_data'
+
+images:
+  - 'gcr.io/$PROJECT_ID/ezpass-app:latest'
+
+options:
+  machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: '1200s'

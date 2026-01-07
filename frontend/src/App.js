@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Chart, registerables } from 'chart.js';
 import Plot from 'react-plotly.js';
-import { useMsal, useIsAuthenticated } from "@azure/msal-react";
-import { loginRequest } from "./authConfig";
+import { useMsal } from "@azure/msal-react";
 
 Chart.register(...registerables);
 
-const apiUrl = process.env.REACT_APP_API_URL;
+// Use relative path if REACT_APP_API_URL is not set
+const apiUrl = process.env.REACT_APP_API_URL || '';
 
 const fetchTransactions = async (page = 1, limit = 50, search = '', status = 'all', category = 'all') => {
     try {
@@ -2019,8 +2019,7 @@ export default function App() {
         return localStorage.getItem('bypassLogin') === 'true';
     });
 
-    const { instance, accounts } = useMsal();
-    const isAuthenticated = useIsAuthenticated();
+    const { accounts } = useMsal();
     // Use bypass login state instead of actual MSAL authentication
     const effectiveAuth = isLoggedIn;
 

@@ -1,0 +1,69 @@
+# This file specifies files that are *not* uploaded to Google Cloud
+# using gcloud. It follows the same syntax as .gitignore
+
+# IMPORTANT: Dockerfile must be included!
+# Explicitly include Dockerfile (in case default patterns exclude it)
+!/Dockerfile
+!/Dockerfile.*
+
+# Git files
+.git/
+.gitignore
+
+# Documentation
+*.md
+!QUICK-START.md
+
+# Logs
+logs/
+*.log
+
+# Environment files (but we'll set these as env vars)
+.env
+.env.*
+!env.template
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+ENV/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs (but we need frontend/build for Docker)
+frontend/build/
+backend/static/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data directories
+data/
+*.csv
+
+# Keys (we'll set these as env vars)
+backend/keys/*.json
+!backend/keys/.gitkeep
+
+# Other
+*.zip
+*.tar.gz
+*.tgz
+
