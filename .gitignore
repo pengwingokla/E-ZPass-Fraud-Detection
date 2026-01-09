@@ -158,7 +158,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
-src/airflow/logs/scheduler/
 
 # Runtime data
 pids/
@@ -345,13 +344,11 @@ credentials.json
 # Fraud Detection Specific
 # ML training outputs
 ml-analytics/models/
-ml-analytics/logs/
 ml-analytics/data/processed/
 ml-analytics/experiments/
 
 # Backend specific
 backend/uploads/
-backend/logs/
 backend/tmp/
 
 # Frontend specific
@@ -366,17 +363,14 @@ frontend/node_modules
 
 # Monitoring and analytics
 monitoring/
-analytics/logs/
 
 # Airflow specific
 airflow/plugins/__pycache__/
 airflow/dags/__pycache__/
-airflow/logs/
 
 # dbt specific
-ezpass_dbt/target/
-ezpass_dbt/logs/
-ezpass_dbt/dbt_packages/
+src/ezpass_dbt/target/
+src/ezpass_dbt/dbt_packages/
 
 # GCP keys and service account credentials
 gcp-key.json

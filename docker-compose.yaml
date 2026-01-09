@@ -31,15 +31,24 @@ x-airflow-common:
     # Alternatively, mount gcloud config for Application Default Credentials
     # CLOUDSDK_CONFIG: /opt/airflow/config/gcloud
     # _PIP_ADDITIONAL_REQUIREMENTS removed - packages installed in Dockerfile to avoid slow runtime installs
+    # MLflow configuration
+    MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-}
+    MLFLOW_EXPERIMENT_NAME: ${MLFLOW_EXPERIMENT_NAME:-ezpass-fraud-detection}
+    MLFLOW_TRACKING_DIR: ${MLFLOW_TRACKING_DIR:-/opt/airflow/mlflow-tracking}
+    MLFLOW_ARTIFACT_DIR: ${MLFLOW_ARTIFACT_DIR:-/opt/airflow/mlflow-artifacts}
+    USE_MLFLOW: ${USE_MLFLOW:-true}
   volumes:
     - ./src/airflow/dags:/opt/airflow/dags
-    - ./src/airflow/logs:/opt/airflow/logs
+    - ./logs/airflow:/opt/airflow/logs
     - ./src/airflow/plugins:/opt/airflow/plugins
     - ./src/airflow/config:/opt/airflow/config
     - ./src/ml_train:/opt/airflow/ml_train
     - ./data:/opt/airflow/data
     - ./.env:/opt/airflow/.env
-    - ./ezpass_dbt:/opt/airflow/dbt_project
+    - ./src/ezpass_dbt:/opt/airflow/dbt_project
+    # MLflow tracking and artifacts (persist across container restarts)
+    - mlflow-tracking:/opt/airflow/mlflow-tracking
+    - mlflow-artifacts:/opt/airflow/mlflow-artifacts
     # Uncomment below to use your local gcloud credentials (if no service account key)
     # - ~/.config/gcloud:/opt/airflow/config/gcloud:ro
   user: "${AIRFLOW_UID:-50000}:0"
@@ -105,7 +114,12 @@ services:
         function ver() {
           printf "%04d%04d%04d%04d" $${1//./ }
         }
-        airflow_version=$$(AIRFLOW__LOGGING__LOGGING_LEVEL=INFO && gosu airflow airflow version)
+        # Try to use gosu if available, otherwise run as current user (root)
+        if command -v gosu >/dev/null 2>&1; then
+          airflow_version=$$(AIRFLOW__LOGGING__LOGGING_LEVEL=INFO && gosu airflow airflow version)
+        else
+          airflow_version=$$(AIRFLOW__LOGGING__LOGGING_LEVEL=INFO && airflow version)
+        fi
         airflow_version_comparable=$$(ver $${airflow_version})
         min_airflow_version=2.2.0
         min_airflow_version_comparable=$$(ver $${min_airflow_version})
@@ -159,7 +173,10 @@ services:
           echo
         fi
         mkdir -p /sources/logs /sources/dags /sources/plugins /sources/config
-        chown -R "${AIRFLOW_UID}:0" /sources/{logs,dags,plugins,config}
+        # Set ownership if AIRFLOW_UID is set, otherwise use default (root)
+        if [[ -n "${AIRFLOW_UID}" ]]; then
+          chown -R "${AIRFLOW_UID}:0" /sources/{logs,dags,plugins,config}
+        fi
         exec /entrypoint airflow version
     environment:
       <<: *airflow-common-env
@@ -172,5 +189,27 @@ services:
     volumes:
       - ./src/airflow:/sources
 
+  mlflow-ui:
+    <<: *airflow-common
+    command: >
+      bash -c "
+      mkdir -p /opt/airflow/mlflow-tracking /opt/airflow/mlflow-artifacts && 
+      chmod -R 777 /opt/airflow/mlflow-tracking /opt/airflow/mlflow-artifacts 2>/dev/null || true &&
+      python -m mlflow ui --host 0.0.0.0 --port 5005 --backend-store-uri file:///opt/airflow/mlflow-tracking --default-artifact-root file:///opt/airflow/mlflow-artifacts
+      "
+    user: "0:0"
+    ports:
+      - "5005:5005"
+    volumes:
+      - mlflow-tracking:/opt/airflow/mlflow-tracking
+      - mlflow-artifacts:/opt/airflow/mlflow-artifacts
+    environment:
+      <<: *airflow-common-env
+    depends_on:
+      <<: *airflow-common-depends-on
+    restart: always
+
 volumes:
   postgres-db-volume:
+  mlflow-tracking:
+  mlflow-artifacts:

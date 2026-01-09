@@ -1,0 +1,33 @@
+# dbt build artifacts
+target/
+dbt_packages/
+logs/
+*.log
+
+# dbt cache
+.dbt/
+
+# dbt user-specific config
+.user.yml
+
+# Compiled SQL files
+*.sqlc
+
+# dbt test results
+test-results/
+
+# Python cache (if running dbt via Python)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment files
+.env
+.env.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
