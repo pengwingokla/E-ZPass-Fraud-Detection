@@ -7,18 +7,52 @@ from sklearn.cluster import DBSCAN
 import joblib
 import os
 from datetime import datetime
+import mlflow
+import mlflow.sklearn
+from mlflow.tracking import MlflowClient
+import sys
+
+# Add parent directory to path to import mlflow_config
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+try:
+    from mlflow_config import setup_mlflow_tracking, log_model_to_mlflow
+except ImportError:
+    # Fallback if mlflow_config not found
+    setup_mlflow_tracking = None
+    log_model_to_mlflow = None
 
 class FraudDetectionTrainer:
-    def __init__(self, project_id, location, bq_table):
+    def __init__(self, project_id, location, bq_table, use_mlflow=True, mlflow_experiment_name="ezpass-fraud-detection"):
         self.project_id = project_id
         self.location = location
         self.bq_table = bq_table
+        self.use_mlflow = use_mlflow
+        self.mlflow_experiment_name = mlflow_experiment_name
         
         # Initialize Vertex AI
         aiplatform.init(
             project=project_id,
             location=location
         )
+        
+        # Set up MLflow tracking if enabled
+        if self.use_mlflow:
+            if setup_mlflow_tracking is None:
+                print("⚠ MLflow config module not found, disabling MLflow")
+                self.use_mlflow = False
+            else:
+                gcs_bucket = os.getenv("GCS_BUCKET_NAME")
+                tracking_uri = os.getenv("MLFLOW_TRACKING_URI")  # Optional: set to MLflow server URI
+                self.mlflow_client, self.mlflow_experiment_id = setup_mlflow_tracking(
+                    tracking_uri=tracking_uri,
+                    experiment_name=mlflow_experiment_name,
+                    gcs_bucket=gcs_bucket,
+                    project_id=project_id
+                )
+                print(f"✓ MLflow tracking initialized (experiment: {mlflow_experiment_name})")
         
     def load_features_from_bigquery(self):
         client = bigquery.Client(project=self.project_id)
@@ -93,7 +127,7 @@ class FraudDetectionTrainer:
         # Return the original dataframe as well for predictions
         return X_scaled, scaler, feature_cols, df_ids, df
     
-    def train_isolation_forest(self, X_scaled, contamination=0.01):
+    def train_isolation_forest(self, X_scaled, contamination=0.01, n_estimators=100, max_samples='auto', n_jobs=2):
         """Train Isolation Forest for anomaly detection"""
         import time
         import numpy as np
@@ -101,13 +135,40 @@ class FraudDetectionTrainer:
         print("Training Isolation Forest...")
         start_time = time.time()
         
-        model = IsolationForest(
-            contamination=contamination,
-            random_state=42,
-            n_estimators=100,
-            max_samples='auto',
-            n_jobs=2
-        )
+        # Model parameters
+        model_params = {
+            'contamination': contamination,
+            'random_state': 42,
+            'n_estimators': n_estimators,
+            'max_samples': max_samples,
+            'n_jobs': n_jobs
+        }
+        
+        # Log parameters to MLflow if enabled (run should already be active from run_training_pipeline)
+        if self.use_mlflow:
+            # Don't start a new run here - it should already be active from run_training_pipeline()
+            # Just verify we have an active run, and if not, start one (shouldn't happen normally)
+            try:
+                if mlflow.active_run() is None:
+                    # This shouldn't happen, but handle it gracefully
+                    print("⚠ Warning: No active MLflow run found, starting one...")
+                    mlflow.start_run()
+            except Exception:
+                # If we can't check or there's an issue, just continue - the run should exist
+                pass
+            # Log parameters
+            mlflow.log_params({
+                'model_type': 'isolation_forest',
+                'contamination': contamination,
+                'n_estimators': n_estimators,
+                'max_samples': str(max_samples),
+                'n_jobs': n_jobs,
+                'random_state': 42
+            })
+            mlflow.set_tag('project', 'ezpass-fraud-detection')
+            mlflow.set_tag('model_type', 'isolation_forest')
+        
+        model = IsolationForest(**model_params)
         
         model.fit(X_scaled)
         training_time = time.time() - start_time
@@ -140,6 +201,12 @@ class FraudDetectionTrainer:
             'score_max': float(anomaly_scores.max()),
             'score_median': float(score_percentiles[3]),
         }
+        
+        # Log metrics to MLflow
+        if self.use_mlflow:
+            mlflow.log_metrics(metrics)
+            mlflow.set_tag('run_type', 'training')
+            mlflow.set_tag('dataset', self.bq_table)
         
         print(f"✓ Training completed in {training_time:.2f}s")
         print(f"  Samples: {len(X_scaled):,}")
@@ -239,24 +306,95 @@ class FraudDetectionTrainer:
         print(f"  Sample:\n{final_df.head(3)}")
         
         # Write to BigQuery
+        from google.api_core import exceptions
+        
         client = bigquery.Client(project=self.project_id)
-        job_config = bigquery.LoadJobConfig(
-            write_disposition="WRITE_APPEND"
-        )
         
-        job = client.load_table_from_dataframe(
-            final_df, output_table, job_config=job_config
-        )
-        job.result()
-        
-        print(f"✓ Predictions written to {output_table}")
-        print(f"  Total rows: {len(final_df):,}")
-        print(f"  Anomalies detected: {sum(final_df['is_anomaly']):,}")
-        print(f"  Anomaly rate: {sum(final_df['is_anomaly']) / len(final_df) * 100:.2f}%")
+        try:
+            # Check if table exists first
+            try:
+                client.get_table(output_table)
+            except Exception:
+                # Table doesn't exist - try to create it
+                print(f"⚠ Table {output_table} does not exist, attempting to create...")
+                # Define schema based on expected columns
+                schema = []
+                for col in expected_cols:
+                    if col == 'transaction_id':
+                        schema.append(bigquery.SchemaField(col, "STRING", mode="NULLABLE"))
+                    elif col in ['is_anomaly']:
+                        schema.append(bigquery.SchemaField(col, "INTEGER", mode="REQUIRED"))
+                    elif col in ['ml_anomaly_score', 'prediction_timestamp']:
+                        if col == 'prediction_timestamp':
+                            schema.append(bigquery.SchemaField(col, "TIMESTAMP", mode="REQUIRED"))
+                        else:
+                            schema.append(bigquery.SchemaField(col, "FLOAT64", mode="REQUIRED"))
+                    elif col in ['exit_hour', 'driver_amount_last_30txn_count', 'driver_daily_txn_count',
+                                 'route_name_freq_encoded', 'entry_plaza_freq_encoded', 'exit_plaza_freq_encoded',
+                                 'vehicle_type_freq_encoded', 'agency_freq_encoded', 'travel_time_of_day_freq_encoded']:
+                        schema.append(bigquery.SchemaField(col, "INTEGER", mode="NULLABLE"))
+                    elif col == 'vehicle_type_code':
+                        schema.append(bigquery.SchemaField(col, "STRING", mode="NULLABLE"))
+                    else:
+                        schema.append(bigquery.SchemaField(col, "FLOAT64", mode="NULLABLE"))
+                
+                table = bigquery.Table(output_table, schema=schema)
+                table.description = "ML fraud predictions for E-ZPass transactions"
+                
+                # Add time partitioning
+                table.time_partitioning = bigquery.TimePartitioning(
+                    type_=bigquery.TimePartitioningType.DAY,
+                    field="prediction_timestamp"
+                )
+                
+                try:
+                    client.create_table(table)
+                    print(f"✓ Created predictions table: {output_table}")
+                except exceptions.Forbidden as e:
+                    print(f"⚠ Permission denied: Cannot create table {output_table}")
+                    print(f"⚠ Error: {e}")
+                    print(f"⚠ Skipping predictions write - table must be created manually or permissions granted")
+                    print(f"⚠ Training completed successfully, but predictions were not saved to BigQuery")
+                    print(f"  Total rows processed: {len(final_df):,}")
+                    print(f"  Anomalies detected: {sum(final_df['is_anomaly']):,}")
+                    print(f"  Anomaly rate: {sum(final_df['is_anomaly']) / len(final_df) * 100:.2f}%")
+                    return
+            
+            # Table exists, try to append data
+            job_config = bigquery.LoadJobConfig(
+                write_disposition="WRITE_APPEND",
+                create_disposition="CREATE_NEVER"  # Don't try to create if missing
+            )
+            
+            job = client.load_table_from_dataframe(
+                final_df, output_table, job_config=job_config
+            )
+            job.result()
+            
+            print(f"✓ Predictions written to {output_table}")
+            print(f"  Total rows: {len(final_df):,}")
+            print(f"  Anomalies detected: {sum(final_df['is_anomaly']):,}")
+            print(f"  Anomaly rate: {sum(final_df['is_anomaly']) / len(final_df) * 100:.2f}%")
+            
+        except exceptions.Forbidden as e:
+            print(f"⚠ Permission denied: Cannot write to table {output_table}")
+            print(f"⚠ Error: {e}")
+            print(f"⚠ Skipping predictions write - ensure service account has BigQuery Data Editor role")
+            print(f"⚠ Training completed successfully, but predictions were not saved to BigQuery")
+            print(f"  Total rows processed: {len(final_df):,}")
+            print(f"  Anomalies detected: {sum(final_df['is_anomaly']):,}")
+            print(f"  Anomaly rate: {sum(final_df['is_anomaly']) / len(final_df) * 100:.2f}%")
+        except Exception as e:
+            print(f"⚠ Error writing predictions to BigQuery: {e}")
+            print(f"⚠ Skipping predictions write - training will continue")
+            print(f"  Total rows processed: {len(final_df):,}")
+            print(f"  Anomalies detected: {sum(final_df['is_anomaly']):,}")
+            print(f"  Anomaly rate: {sum(final_df['is_anomaly']) / len(final_df) * 100:.2f}%")
     
     def log_training_metrics(self, metrics, model_type="isolation_forest"):
         """Save training metrics to BigQuery"""
         from google.cloud import bigquery
+        from google.api_core import exceptions
         from datetime import datetime
         import pandas as pd
         
@@ -272,15 +410,61 @@ class FraudDetectionTrainer:
             **metrics
         }])
         
-        job_config = bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
-        
-        client.load_table_from_dataframe(
-            metrics_df, 
-            table_id,
-            job_config=job_config
-        ).result()
-        
-        print(f"✓ Metrics logged to {table_id}")
+        try:
+            # Check if table exists first
+            try:
+                client.get_table(table_id)
+            except Exception:
+                # Table doesn't exist - try to create it
+                print(f"⚠ Table {table_id} does not exist, attempting to create...")
+                schema = [
+                    bigquery.SchemaField("model_id", "STRING"),
+                    bigquery.SchemaField("model_type", "STRING"),
+                    bigquery.SchemaField("training_timestamp", "TIMESTAMP"),
+                    bigquery.SchemaField("training_time_seconds", "FLOAT64"),
+                    bigquery.SchemaField("n_samples", "INTEGER"),
+                    bigquery.SchemaField("n_features", "INTEGER"),
+                    bigquery.SchemaField("n_estimators", "INTEGER"),
+                    bigquery.SchemaField("contamination", "FLOAT64"),
+                    bigquery.SchemaField("n_anomalies", "INTEGER"),
+                    bigquery.SchemaField("anomaly_rate", "FLOAT64"),
+                    bigquery.SchemaField("score_mean", "FLOAT64"),
+                    bigquery.SchemaField("score_std", "FLOAT64"),
+                    bigquery.SchemaField("score_min", "FLOAT64"),
+                    bigquery.SchemaField("score_max", "FLOAT64"),
+                    bigquery.SchemaField("score_median", "FLOAT64"),
+                ]
+                table = bigquery.Table(table_id, schema=schema)
+                table.description = "ML model training metrics over time"
+                try:
+                    client.create_table(table)
+                    print(f"✓ Created metrics table: {table_id}")
+                except exceptions.Forbidden as e:
+                    print(f"⚠ Permission denied: Cannot create table {table_id}")
+                    print(f"⚠ Skipping metrics logging - table must be created manually or permissions granted")
+                    return
+            
+            # Table exists, try to append data
+            job_config = bigquery.LoadJobConfig(
+                write_disposition="WRITE_APPEND",
+                create_disposition="CREATE_NEVER"  # Don't try to create if missing
+            )
+            
+            client.load_table_from_dataframe(
+                metrics_df, 
+                table_id,
+                job_config=job_config
+            ).result()
+            
+            print(f"✓ Metrics logged to {table_id}")
+            
+        except exceptions.Forbidden as e:
+            print(f"⚠ Permission denied: Cannot write to table {table_id}")
+            print(f"⚠ Error: {e}")
+            print(f"⚠ Skipping metrics logging - ensure service account has BigQuery Data Editor role")
+        except Exception as e:
+            print(f"⚠ Error logging metrics to BigQuery: {e}")
+            print(f"⚠ Skipping metrics logging - training will continue")
 
     def run_training_pipeline(self):
         """Execute full training pipeline"""
@@ -288,41 +472,110 @@ class FraudDetectionTrainer:
         print("STARTING ML TRAINING PIPELINE")
         print("=" * 60)
 
-        # 1. Load features from BigQuery
-        print("\n[1/6] Loading features from BigQuery")
-        df = self.load_features_from_bigquery()
-        
-        # 2. Preprocess
-        print("\n[2/6] Preprocessing features")
-        X_scaled, scaler, feature_cols, df_ids, df_original = self.preprocess_features(df)
-        
-        # 3. Train Isolation Forest
-        print("\n[3/6] Training Isolation Forest")
-        isoforest_model, anomaly_scores, predictions, metrics = self.train_isolation_forest(X_scaled)
-        
-        # 4. Log metrics to BigQuery
-        print("\n[4/6] Logging training metrics")
-        self.log_training_metrics(metrics, "isolation_forest")
-        
-        # 5. Save artifacts
-        print("\n[5/6] Saving model artifacts")
-        artifacts_dir = self.save_model_artifacts(
-            isoforest_model, scaler, feature_cols, "isolation_forest"
-        )
-        
-        # 6. Write predictions to BigQuery
-        print("\n[6/6] Writing predictions to BigQuery")
-        output_table = f"{self.project_id}.ezpass_data.fraud_predictions"
-        self.write_predictions_to_bigquery(df_original, predictions, anomaly_scores, output_table)
-        
-        # Optional: Upload to Vertex AI
-        # vertex_model = self.upload_to_vertex_ai(artifacts_dir, "isolation_forest")
-        
-        print("\n" + "=" * 60)
-        print("✓ ML TRAINING PIPELINE COMPLETED SUCCESSFULLY")
-        print("=" * 60)
-        
-        return isoforest_model, anomaly_scores, metrics
+        # Start MLflow run at the beginning if enabled
+        if self.use_mlflow:
+            # End any existing active run first (use try/except for safety)
+            try:
+                active_run = mlflow.active_run()
+                if active_run is not None:
+                    mlflow.end_run()
+            except Exception:
+                # If there's an error checking, try to end anyway
+                try:
+                    mlflow.end_run()
+                except Exception:
+                    pass
+            # Start a fresh run
+            mlflow.start_run()
+
+        try:
+            # 1. Load features from BigQuery
+            print("\n[1/7] Loading features from BigQuery")
+            df = self.load_features_from_bigquery()
+            
+            if self.use_mlflow:
+                mlflow.log_param('dataset_size', len(df))
+                mlflow.log_param('source_table', self.bq_table)
+            
+            # 2. Preprocess
+            print("\n[2/7] Preprocessing features")
+            X_scaled, scaler, feature_cols, df_ids, df_original = self.preprocess_features(df)
+            
+            if self.use_mlflow:
+                mlflow.log_param('n_features', X_scaled.shape[1])
+                mlflow.log_param('feature_columns', ','.join(feature_cols))
+            
+            # 3. Train Isolation Forest
+            print("\n[3/7] Training Isolation Forest")
+            isoforest_model, anomaly_scores, predictions, metrics = self.train_isolation_forest(X_scaled)
+            
+            # 4. Log model to MLflow
+            if self.use_mlflow:
+                print("\n[4/7] Logging model to MLflow")
+                model_uri = mlflow.sklearn.log_model(
+                    isoforest_model,
+                    artifact_path="model",
+                    registered_model_name="ezpass-fraud-isolation-forest"
+                )
+                print(f"✓ Model logged to MLflow: {model_uri}")
+                
+                # Log scaler and feature columns as additional artifacts
+                import tempfile
+                import json
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    # Save scaler
+                    scaler_path = os.path.join(tmpdir, "scaler.joblib")
+                    joblib.dump(scaler, scaler_path)
+                    mlflow.log_artifact(scaler_path, artifact_path="preprocessing")
+                    
+                    # Save feature columns
+                    feature_path = os.path.join(tmpdir, "feature_columns.json")
+                    with open(feature_path, "w") as f:
+                        json.dump(feature_cols, f)
+                    mlflow.log_artifact(feature_path, artifact_path="preprocessing")
+            
+            # 5. Log metrics to BigQuery (keep existing functionality)
+            print("\n[5/7] Logging training metrics to BigQuery")
+            self.log_training_metrics(metrics, "isolation_forest")
+            
+            # 6. Save artifacts (for backward compatibility)
+            print("\n[6/7] Saving model artifacts locally")
+            artifacts_dir = self.save_model_artifacts(
+                isoforest_model, scaler, feature_cols, "isolation_forest"
+            )
+            
+            if self.use_mlflow:
+                mlflow.log_param('local_artifacts_dir', artifacts_dir)
+            
+            # 7. Write predictions to BigQuery
+            print("\n[7/7] Writing predictions to BigQuery")
+            output_table = f"{self.project_id}.ezpass_data.fraud_predictions"
+            self.write_predictions_to_bigquery(df_original, predictions, anomaly_scores, output_table)
+            
+            if self.use_mlflow:
+                mlflow.log_param('predictions_table', output_table)
+                mlflow.set_tag('status', 'completed')
+                run_id = mlflow.active_run().info.run_id
+                print(f"✓ MLflow run ID: {run_id}")
+                print(f"  View run: mlflow ui (then navigate to run {run_id})")
+            
+            # Optional: Upload to Vertex AI
+            # vertex_model = self.upload_to_vertex_ai(artifacts_dir, "isolation_forest")
+            
+            print("\n" + "=" * 60)
+            print("✓ ML TRAINING PIPELINE COMPLETED SUCCESSFULLY")
+            print("=" * 60)
+            
+            return isoforest_model, anomaly_scores, metrics
+            
+        except Exception as e:
+            if self.use_mlflow and mlflow.active_run():
+                mlflow.set_tag('status', 'failed')
+                mlflow.log_param('error', str(e))
+            raise
+        finally:
+            if self.use_mlflow and mlflow.active_run():
+                mlflow.end_run()
 
 if __name__ == "__main__":
     trainer = FraudDetectionTrainer(

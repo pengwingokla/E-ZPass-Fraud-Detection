@@ -133,8 +133,8 @@ fi
 
 echo ""
 
-# Create logs directory if it doesn't exist
-mkdir -p logs
+# Create centralized logs directory structure if it doesn't exist
+mkdir -p logs/backend logs/frontend logs/airflow logs/dbt logs/mlflow
 
 # Check if ports are available
 echo -e "${YELLOW}Checking if ports are available...${NC}"
@@ -149,6 +149,10 @@ fi
 
 if port_in_use 3000; then
     echo -e "${YELLOW}⚠ Port 3000 is already in use (Frontend)${NC}"
+fi
+
+if port_in_use 5005; then
+    echo -e "${YELLOW}⚠ Port 5005 is already in use (MLflow UI)${NC}"
 fi
 
 echo ""
@@ -249,7 +253,7 @@ fi
 
 # Start backend in background with the environment variable
 echo -e "${YELLOW}Starting Flask backend server...${NC}"
-BIGQUERY_KEY_JSON="$BIGQUERY_KEY_JSON" python3 app.py > ../logs/backend.log 2>&1 &
+BIGQUERY_KEY_JSON="$BIGQUERY_KEY_JSON" python3 app.py > ../logs/backend/backend.log 2>&1 &
 BACKEND_PID=$!
 cd ..
 
@@ -261,7 +265,7 @@ WAIT_COUNT=0
 while ! curl -s http://localhost:5001/api/table-info >/dev/null 2>&1; do
     if [ $WAIT_COUNT -ge $MAX_WAIT ]; then
         echo -e "${RED}✗ Backend failed to start within $MAX_WAIT seconds${NC}"
-        echo -e "${YELLOW}Check logs/backend.log for errors${NC}"
+        echo -e "${YELLOW}Check logs/backend/backend.log for errors${NC}"
         exit 1
     fi
     echo -n "."
@@ -288,7 +292,7 @@ fi
 
 # Start frontend in background
 echo -e "${YELLOW}Starting React development server...${NC}"
-npm start > ../logs/frontend.log 2>&1 &
+npm start > ../logs/frontend/frontend.log 2>&1 &
 FRONTEND_PID=$!
 cd ..
 
@@ -299,7 +303,7 @@ MAX_WAIT=60
 WAIT_COUNT=0
 while ! curl -s http://localhost:3000 >/dev/null 2>&1; do
     if [ $WAIT_COUNT -ge $MAX_WAIT ]; then
-        echo -e "${YELLOW}⚠ Frontend may still be starting. Check logs/frontend.log${NC}"
+        echo -e "${YELLOW}⚠ Frontend may still be starting. Check logs/frontend/frontend.log${NC}"
         break
     fi
     echo -n "."
@@ -318,11 +322,13 @@ echo -e "${GREEN}Services:${NC}"
 echo -e "  • Airflow UI:    ${BLUE}http://localhost:8080${NC} (airflow/airflow)"
 echo -e "  • Backend API:   ${BLUE}http://localhost:5001${NC}"
 echo -e "  • Frontend:      ${BLUE}http://localhost:3000${NC}"
+echo -e "  • MLflow UI:     ${BLUE}http://localhost:5005${NC}"
 echo ""
 echo -e "${YELLOW}Logs:${NC}"
-echo -e "  • Backend:  logs/backend.log"
-echo -e "  • Frontend: logs/frontend.log"
-echo -e "  • Airflow:  docker-compose logs -f"
+echo -e "  • Backend:  logs/backend/backend.log"
+echo -e "  • Frontend: logs/frontend/frontend.log"
+echo -e "  • Airflow:  logs/airflow/ (or docker-compose logs -f)"
+echo -e "  • MLflow:   docker-compose logs -f mlflow-ui"
 echo ""
 echo -e "${YELLOW}To stop all services, press Ctrl+C or run ./stop.sh${NC}"
 echo ""

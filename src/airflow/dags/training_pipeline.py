@@ -105,6 +105,7 @@ def create_training_metrics_table():
 def delete_predictions_table():
     """Delete fraud_predictions table if it exists"""
     from google.cloud import bigquery
+    from google.api_core import exceptions
     
     if not GCS_PROJECT_ID:
         raise ValueError("GCS_PROJECT_ID must be set")
@@ -115,8 +116,14 @@ def delete_predictions_table():
     try:
         client.delete_table(table_id, not_found_ok=True)
         print(f"✓ Deleted table: {table_id}")
+    except exceptions.Forbidden as e:
+        # Permission denied - log warning but don't fail
+        # The create_predictions_table function will handle existing tables
+        print(f"⚠ Permission denied to delete table {table_id}: {e}")
+        print(f"⚠ Continuing - create_predictions_table will handle existing table")
     except Exception as e:
         print(f"⚠ Could not delete table {table_id}: {e}")
+        # Only raise for unexpected errors, not permission issues
         raise
     
     return table_id
