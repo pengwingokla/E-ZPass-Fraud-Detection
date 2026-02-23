@@ -4,6 +4,8 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
+      - '-f'
+      - 'deploy/Dockerfile'
       - '-t'
       - 'gcr.io/$PROJECT_ID/ezpass-app:latest'
       - '.'

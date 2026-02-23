@@ -10,17 +10,22 @@ BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}GCP Cloud Run Deployment ${NC}"
-echo -e "${BLUE}========================================${NC}"
-echo ""
+# Resolve repo root (one level up from deploy/)
+SCRIPT_DIR="$( cd -- \"$( dirname \"${BASH_SOURCE[0]}\" )\" &> /dev/null && pwd )"
+REPO_ROOT=\"${SCRIPT_DIR%/deploy}\"
+cd \"$REPO_ROOT\"
+
+echo -e \"${BLUE}========================================${NC}\"
+echo -e \"${BLUE}GCP Cloud Run Deployment ${NC}\"
+echo -e \"${BLUE}========================================${NC}\"
+echo \"\"
 
 # Check if Dockerfile exists
-if [ ! -f "Dockerfile" ]; then
-    echo -e "${RED}✗ Dockerfile not found in current directory!${NC}"
+if [ ! -f \"deploy/Dockerfile\" ]; then
+    echo -e \"${RED}✗ Dockerfile not found at deploy/Dockerfile!${NC}\"
     exit 1
 fi
-echo -e "${GREEN}✓ Dockerfile found${NC}"
+echo -e \"${GREEN}✓ Dockerfile found${NC}\"
 
 # Get project ID
 PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
@@ -52,9 +57,9 @@ echo -e "${YELLOW}(This may take 5-10 minutes)${NC}"
 echo ""
 
 # Use Cloud Build with explicit Dockerfile reference
-if [ -f "cloudbuild.yaml" ]; then
-    echo -e "${GREEN}✓ Using Cloud Build configuration${NC}"
-    gcloud builds submit --config cloudbuild.yaml .
+if [ -f \"deploy/cloudbuild.yaml\" ]; then
+    echo -e \"${GREEN}✓ Using Cloud Build configuration${NC}\"
+    gcloud builds submit --config deploy/cloudbuild.yaml .
     DEPLOY_EXIT_CODE=$?
     
     # Update environment variables after deployment (key file is excluded from build)

@@ -4,8 +4,8 @@ x-airflow-common:
   &airflow-common
   # Build from Dockerfile instead of using base image
   build:
-    context: .
-    dockerfile: Dockerfile.airflow
+    context: ..
+    dockerfile: deploy/Dockerfile.airflow
   image: ezpass-airflow:latest
   environment:
     &airflow-common-env
@@ -208,6 +208,27 @@ services:
     depends_on:
       <<: *airflow-common-depends-on
     restart: always
+
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    environment:
+      # Project / dataset / table for backend
+      GCS_PROJECT_ID: ${GCS_PROJECT_ID}
+      BIGQUERY_DATASET: ${BIGQUERY_DATASET:-ezpass_data}
+      BIGQUERY_TABLE: ${BIGQUERY_TABLE:-master_viz}
+      # Use mounted service account key inside the container
+      GOOGLE_APPLICATION_CREDENTIALS: /app/gcp-key.json
+    volumes:
+      # Mount backend GCP key into the container (read-only)
+      - ./backend/keys/gcp-key.json:/app/gcp-key.json:ro
+    ports:
+      # Expose combined backend+frontend on localhost:5001
+      - "5001:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres-db-volume:
