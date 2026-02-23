@@ -6,6 +6,9 @@ import os
 import tempfile
 
 load_dotenv()
+# Also load root .env so GCS_PROJECT_ID / BIGQUERY_DATASET are available when running from backend/
+_root_env = os.path.join(os.path.dirname(__file__), "..", ".env")
+load_dotenv(_root_env)
 
 # Service account JSON stored in environment variable
 key_json_str = os.getenv("BIGQUERY_KEY_JSON")
@@ -34,10 +37,20 @@ else:
 
 CORS(app)
 
+# BigQuery project and dataset from env (same as Airflow/GCS project)
+BIGQUERY_PROJECT_ID = os.getenv("GCS_PROJECT_ID") or os.getenv("BIGQUERY_PROJECT_ID")
+BIGQUERY_DATASET = os.getenv("BIGQUERY_DATASET", "ezpass_data")
 TABLE_NAME = os.getenv("BIGQUERY_TABLE", "master_viz")
 
+if not BIGQUERY_PROJECT_ID:
+    raise ValueError(
+        "GCS_PROJECT_ID or BIGQUERY_PROJECT_ID environment variable is not set. "
+        "Set one of them to your GCP project ID."
+    )
+
+
 def get_table():
-    return f"`njc-ezpass.ezpass_data.{TABLE_NAME}`"
+    return f"`{BIGQUERY_PROJECT_ID}.{BIGQUERY_DATASET}.{TABLE_NAME}`"
 
 
 #Get all transactions with pagination

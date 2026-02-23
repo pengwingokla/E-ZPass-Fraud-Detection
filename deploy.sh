@@ -41,7 +41,7 @@ echo -e "${GREEN}✓ APIs enabled${NC}"
 echo ""
 
 # Check for key file
-KEY_FILE="backend/keys/backend-key.json"
+KEY_FILE="backend/keys/gcp-key.json"
 if [ ! -f "$KEY_FILE" ]; then
     KEY_FILE="backend/keys/bigquery.json"
 fi
@@ -56,6 +56,30 @@ if [ -f "cloudbuild.yaml" ]; then
     echo -e "${GREEN}✓ Using Cloud Build configuration${NC}"
     gcloud builds submit --config cloudbuild.yaml .
     DEPLOY_EXIT_CODE=$?
+    
+    # Update environment variables after deployment (key file is excluded from build)
+    if [ $DEPLOY_EXIT_CODE -eq 0 ] && [ -f "$KEY_FILE" ]; then
+        echo ""
+        echo -e "${YELLOW}Updating environment variables...${NC}"
+        if [ -f "update-env-vars.sh" ]; then
+            bash update-env-vars.sh
+        else
+            # Fallback: update directly
+            TEMP_FILE=$(mktemp)
+            KEY_JSON=$(cat "$KEY_FILE" | python3 -c "import json, sys; print(json.dumps(json.load(sys.stdin), separators=(',', ':')))")
+            cat > "$TEMP_FILE" << EOF
+BIGQUERY_KEY_JSON: |
+  $KEY_JSON
+EOF
+            gcloud run services update ezpass-app \
+              --region us-central1 \
+              --env-vars-file "$TEMP_FILE" \
+              --project "$PROJECT_ID" \
+              --quiet
+            rm -f "$TEMP_FILE"
+            echo -e "${GREEN}✓ Environment variables updated${NC}"
+        fi
+    fi
 else
     # Fallback: use --source but verify Dockerfile is included
     echo -e "${YELLOW}Using --source method...${NC}"

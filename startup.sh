@@ -97,12 +97,16 @@ else
     echo -e "${GREEN}✓ Root .env exists${NC}"
 fi
 
-# Check backend BigQuery key file
-if [ ! -f "backend/keys/bigquery.json" ]; then
-    echo -e "${YELLOW}⚠ Backend BigQuery key file not found at backend/keys/bigquery.json${NC}"
+# Check backend GCP key file (prefer gcp-key.json)
+BACKEND_KEY_FILE="backend/keys/gcp-key.json"
+if [ ! -f "$BACKEND_KEY_FILE" ]; then
+    BACKEND_KEY_FILE="backend/keys/bigquery.json"
+fi
+if [ ! -f "$BACKEND_KEY_FILE" ]; then
+    echo -e "${YELLOW}⚠ Backend GCP key file not found at backend/keys/gcp-key.json or backend/keys/bigquery.json${NC}"
     echo -e "${YELLOW}The backend requires this file to connect to BigQuery${NC}"
 else
-    echo -e "${GREEN}✓ Backend BigQuery key file exists${NC}"
+    echo -e "${GREEN}✓ Backend GCP key file exists${NC}"
 fi
 
 # Check backend .env (for BIGQUERY_TABLE and other settings)
@@ -111,7 +115,7 @@ if [ ! -f "backend/.env" ]; then
     if [ -f "backend/env.template" ]; then
         cp backend/env.template backend/.env
         sed -i.bak '/^BIGQUERY_KEY_JSON=/d' backend/.env 2>/dev/null || sed -i '' '/^BIGQUERY_KEY_JSON=/d' backend/.env
-        echo -e "${YELLOW}⚠ Backend .env created (BigQuery key will be loaded from backend/keys/bigquery.json)${NC}"
+        echo -e "${YELLOW}⚠ Backend .env created (BigQuery key will be loaded from backend/keys/gcp-key.json or bigquery.json)${NC}"
     else
         echo -e "${RED}✗ backend/env.template not found${NC}"
     fi
@@ -219,18 +223,22 @@ echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}Starting Backend API${NC}"
 echo -e "${BLUE}========================================${NC}"
 
-# Check for BigQuery key file and set environment variable
-if [ ! -f "backend/keys/bigquery.json" ]; then
-    echo -e "${RED}✗ BigQuery key file not found at backend/keys/bigquery.json${NC}"
+# Check for GCP key file and set environment variable
+BACKEND_KEY_FILE="backend/keys/gcp-key.json"
+if [ ! -f "$BACKEND_KEY_FILE" ]; then
+    BACKEND_KEY_FILE="backend/keys/bigquery.json"
+fi
+if [ ! -f "$BACKEND_KEY_FILE" ]; then
+    echo -e "${RED}✗ GCP key file not found at backend/keys/gcp-key.json or backend/keys/bigquery.json${NC}"
     echo -e "${YELLOW}Please ensure the BigQuery service account key file exists${NC}"
     exit 1
 fi
 
 # Read the JSON file and set as environment variable
 # Convert the JSON file to a compact single-line string
-BIGQUERY_KEY_JSON=$(python3 -c "import json; print(json.dumps(json.load(open('backend/keys/bigquery.json')), separators=(',', ':')))")
+BIGQUERY_KEY_JSON=$(python3 -c "import json; print(json.dumps(json.load(open('$BACKEND_KEY_FILE')), separators=(',', ':')))")
 export BIGQUERY_KEY_JSON
-echo -e "${GREEN}✓ Loaded BigQuery credentials from backend/keys/bigquery.json${NC}"
+echo -e "${GREEN}✓ Loaded BigQuery credentials from $BACKEND_KEY_FILE${NC}"
 
 cd backend
 
