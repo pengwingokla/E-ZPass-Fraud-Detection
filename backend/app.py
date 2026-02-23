@@ -1,56 +1,19 @@
-from flask import Flask, jsonify, request, send_from_directory
-from google.cloud import bigquery
-from flask_cors import CORS
-from dotenv import load_dotenv
 import os
-import tempfile
 
-load_dotenv()
-# Also load root .env so GCS_PROJECT_ID / BIGQUERY_DATASET are available when running from backend/
-_root_env = os.path.join(os.path.dirname(__file__), "..", ".env")
-load_dotenv(_root_env)
+from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
 
-# Service account JSON stored in environment variable
-key_json_str = os.getenv("BIGQUERY_KEY_JSON")
-
-if not key_json_str:
-    raise ValueError("BIGQUERY_KEY_JSON environment variable is not set.")
-
-# Use OS temp directory (works on Windows & Linux)
-temp_dir = tempfile.gettempdir()
-key_path = os.path.join(temp_dir, "bigquery-key.json")
-
-# Write JSON to file
-with open(key_path, "w") as f:
-    f.write(key_json_str)
-
-# Initialize BigQuery
-client = bigquery.Client.from_service_account_json(key_path)
+from config import client, get_table, table_name as TABLE_NAME
 
 # Initialize Flask app
 # If static folder exists (from Docker build), serve frontend from there
-static_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+static_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 if os.path.exists(static_folder):
-    app = Flask(__name__, static_folder=static_folder, static_url_path='')
+    app = Flask(__name__, static_folder=static_folder, static_url_path="")
 else:
     app = Flask(__name__)
 
 CORS(app)
-
-# BigQuery project and dataset from env (same as Airflow/GCS project)
-BIGQUERY_PROJECT_ID = os.getenv("GCS_PROJECT_ID") or os.getenv("BIGQUERY_PROJECT_ID")
-BIGQUERY_DATASET = os.getenv("BIGQUERY_DATASET", "ezpass_data")
-TABLE_NAME = os.getenv("BIGQUERY_TABLE", "master_viz")
-
-if not BIGQUERY_PROJECT_ID:
-    raise ValueError(
-        "GCS_PROJECT_ID or BIGQUERY_PROJECT_ID environment variable is not set. "
-        "Set one of them to your GCP project ID."
-    )
-
-
-def get_table():
-    return f"`{BIGQUERY_PROJECT_ID}.{BIGQUERY_DATASET}.{TABLE_NAME}`"
 
 
 #Get all transactions with pagination
