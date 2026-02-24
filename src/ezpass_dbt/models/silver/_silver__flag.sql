@@ -8,7 +8,7 @@ WITH base_features AS (
 ),
 
 holidays AS (
-    SELECT * FROM {{ source('raw', 'holidays') }}
+    SELECT * FROM {{ source('raw', '_holidays') }}
 ),
 
 flagged AS (

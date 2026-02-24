@@ -3,11 +3,11 @@ version: 2
 sources:
   - name: ezpass_predictions
     description: "ML model predictions from the fraud detection pipeline"
-    database: njc-ezpass
+    database: "{{ env_var('GCS_PROJECT_ID', 'ezpass-fd') }}"
     schema: ezpass_data
     tables:
-      - name: fraud_predictions
-        description: "Fraud predictions with anomaly scores and features"
+      - name: pred_raw
+        description: "Raw fraud predictions with anomaly scores and features"
         columns:
           - name: transaction_id
             description: "Unique transaction identifier"

@@ -78,10 +78,10 @@ with DAG(
         }
     )
     
-    # Task 4: Run gold_rulebased and gold_train models
+    # Task 4: Run gold_train models
     dbt_run_gold_train = BashOperator(
         task_id='dbt_gold_extract_train_features',
-        bash_command=f'export PATH="$PATH:/home/airflow/.local/bin" && cd {DBT_PROJECT_DIR} && dbt run --select gold_rulebased gold_train --profiles-dir {DBT_PROFILES_DIR}',
+        bash_command=f'export PATH="$PATH:/home/airflow/.local/bin" && cd {DBT_PROJECT_DIR} && dbt run --select gold_train --profiles-dir {DBT_PROFILES_DIR}',
         env={
             'GOOGLE_APPLICATION_CREDENTIALS': '/opt/airflow/config/gcp-key.json',
             'GCS_PROJECT_ID': GCS_PROJECT_ID or '',

@@ -260,25 +260,52 @@ def upload_to_gcs(**context):
     Step 4: Upload renamed files to Google Cloud Storage
     Checks if file exists in GCS before uploading - skips if already exists
     """
+    import logging
     from google.cloud import storage
-    
+    from google.cloud.exceptions import NotFound
+
+    log = logging.getLogger("airflow.task")
     ti = context['ti']
     renamed_files = ti.xcom_pull(key='renamed_files', task_ids='rename_files')
+
+    # Log GCS config so you can verify bucket name in Docker environment
+    creds_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+    log.info("upload_to_gcs GCS config: GCS_BUCKET_NAME=%s GCS_PROJECT_ID=%s GCS_PREFIX=%s",
+             GCS_BUCKET, GCS_PROJECT_ID, GCS_PREFIX)
+    log.info("upload_to_gcs GOOGLE_APPLICATION_CREDENTIALS=%s exists=%s",
+             creds_path, Path(creds_path).is_file() if creds_path else False)
+    if creds_path and Path(creds_path).is_file():
+        try:
+            import json
+            with open(creds_path) as f:
+                key_data = json.load(f)
+            log.info("upload_to_gcs key project_id=%s client_email=%s",
+                     key_data.get("project_id"), key_data.get("client_email"))
+        except Exception as e:
+            log.warning("upload_to_gcs could not read key metadata: %s", e)
     
     if not renamed_files:
         return 0
     
     # Validate environment variables
     if not GCS_BUCKET:
-        raise ValueError("GCS_BUCKET_NAME environment variable is not set")
+        raise ValueError("GCS_BUCKET_NAME environment variable is not set (check .env and --env-file)")
     
     if not GCS_PROJECT_ID:
-        raise ValueError("GCS_PROJECT_ID environment variable is not set")
+        raise ValueError("GCS_PROJECT_ID environment variable is not set (check .env and --env-file)")
     
-    # Initialize GCS client
+    # Initialize GCS client and verify bucket exists
     client = storage.Client(project=GCS_PROJECT_ID)
-    bucket = client.bucket(GCS_BUCKET)
-    
+    try:
+        bucket = client.get_bucket(GCS_BUCKET)
+        log.info("upload_to_gcs bucket access OK: gs://%s", GCS_BUCKET)
+    except NotFound:
+        log.error("upload_to_gcs bucket not found: gs://%s (project=%s)", GCS_BUCKET, GCS_PROJECT_ID)
+        raise ValueError(
+            f"GCS bucket '{GCS_BUCKET}' does not exist in project {GCS_PROJECT_ID}. "
+            f"Create it: gsutil mb -p {GCS_PROJECT_ID} -l us-central1 gs://{GCS_BUCKET}"
+        ) from None
+
     uploaded_count = 0
     skipped_count = 0
     for local_file in renamed_files:
@@ -752,7 +779,7 @@ def create_training_metrics_table(**context):
         raise ValueError("GCS_PROJECT_ID must be set")
     
     client = bigquery.Client(project=GCS_PROJECT_ID)
-    table_id = f"{GCS_PROJECT_ID}.{BIGQUERY_DATASET}.model_training_metrics"
+    table_id = f"{GCS_PROJECT_ID}.{BIGQUERY_DATASET}.training_metrics"
     
     schema = [
         bigquery.SchemaField("model_id", "STRING"),
@@ -785,7 +812,7 @@ def create_training_metrics_table(**context):
     return table_id
 
 def delete_predictions_table(**context):
-    """Delete fraud_predictions table if it exists"""
+    """Delete pred_raw table if it exists"""
     from google.cloud import bigquery
     from google.api_core import exceptions
     
@@ -793,7 +820,7 @@ def delete_predictions_table(**context):
         raise ValueError("GCS_PROJECT_ID must be set")
     
     client = bigquery.Client(project=GCS_PROJECT_ID)
-    table_id = f"{GCS_PROJECT_ID}.{BIGQUERY_DATASET}.fraud_predictions"
+    table_id = f"{GCS_PROJECT_ID}.{BIGQUERY_DATASET}.pred_raw"
     
     try:
         client.delete_table(table_id, not_found_ok=True)
@@ -811,14 +838,14 @@ def delete_predictions_table(**context):
     return table_id
 
 def create_predictions_table(**context):
-    """Create fraud_predictions table if it doesn't exist"""
+    """Create pred_raw table if it doesn't exist"""
     from google.cloud import bigquery
     
     if not GCS_PROJECT_ID:
         raise ValueError("GCS_PROJECT_ID must be set")
     
     client = bigquery.Client(project=GCS_PROJECT_ID)
-    table_id = f"{GCS_PROJECT_ID}.{BIGQUERY_DATASET}.fraud_predictions"
+    table_id = f"{GCS_PROJECT_ID}.{BIGQUERY_DATASET}.pred_raw"
     
     # Store predictions with key features for ML training
     schema = [
@@ -1018,9 +1045,20 @@ with DAG(
         }
     )
     
+    dbt_run_gold_base = BashOperator(
+        task_id='dbt_gold_base_table',
+        bash_command=f'export PATH="$PATH:/home/airflow/.local/bin" && cd {DBT_PROJECT_DIR} && dbt run --select gold --exclude gold_rulebased --profiles-dir {DBT_PROFILES_DIR}',
+        env={
+            'GOOGLE_APPLICATION_CREDENTIALS': '/opt/airflow/config/gcp-key.json',
+            'GCS_PROJECT_ID': GCS_PROJECT_ID or '',
+            'BIGQUERY_DATASET': BIGQUERY_DATASET,
+            'PATH': '/home/airflow/.local/bin:/usr/local/bin:/usr/bin:/bin',
+        }
+    )
+    
     dbt_run_gold_train = BashOperator(
         task_id='dbt_gold_extract_train_features',
-        bash_command=f'export PATH="$PATH:/home/airflow/.local/bin" && cd {DBT_PROJECT_DIR} && dbt run --select gold_rulebased gold_train --profiles-dir {DBT_PROFILES_DIR}',
+        bash_command=f'export PATH="$PATH:/home/airflow/.local/bin" && cd {DBT_PROJECT_DIR} && dbt run --select gold_train --profiles-dir {DBT_PROFILES_DIR}',
         env={
             'GOOGLE_APPLICATION_CREDENTIALS': '/opt/airflow/config/gcp-key.json',
             'GCS_PROJECT_ID': GCS_PROJECT_ID or '',
@@ -1103,7 +1141,7 @@ with DAG(
     verify_upload >> detect_new_files_gcs >> delete_BQ_bronze >> create_BQ_dataset >> moveto_BQ >> verify_BQ
     
     # Phase 4: DBT transformation pipeline
-    verify_BQ >> dbt_install_deps >> dbt_run_silver >> dbt_run_gold_train >> dbt_run_gold
+    verify_BQ >> dbt_install_deps >> dbt_run_silver >> dbt_run_gold_base >> dbt_run_gold_train >> dbt_run_gold
     
     # Phase 5: ML training pipeline
     dbt_run_gold >> create_ml_dataset_task >> create_training_metrics_table_task >> delete_predictions_table_task >> create_predictions_table_task >> train_fraud_model_task

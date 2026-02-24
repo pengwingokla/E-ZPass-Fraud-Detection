@@ -6,17 +6,14 @@
 WITH base_features AS (
     SELECT * FROM {{ ref('_silver__feateng') }}
 ),
-
-
-distance_lookup AS (
-    SELECT * FROM {{ source('raw', 'address_to_miles') }}
-),
-
--- Extract all in-state plazas (plazas that appear in origin_plaza column)
-instate_plazas AS (
-    SELECT DISTINCT origin_plaza as plaza_name
-    FROM distance_lookup
-),
+-- distance_lookup AS (
+--     SELECT * FROM {{ source('raw', 'address_to_miles') }}
+-- ),
+-- -- Extract all in-state plazas (plazas that appear in origin_plaza column)
+-- instate_plazas AS (
+--     SELECT DISTINCT origin_plaza as plaza_name
+--     FROM distance_lookup
+-- ),
 
 route_sequence AS (
     SELECT
@@ -74,11 +71,11 @@ check_route AS (
             WHEN rf.exit_plaza IS NULL OR rf.exit_plaza = 'Unknown' 
                  OR rf.exit_plaza_previous IS NULL OR rf.exit_plaza_previous = 'Unknown' 
             THEN 'Unknown'
-            -- Both plazas must be in-state for route to be In-state
-            WHEN rf.exit_plaza IN (SELECT plaza_name FROM instate_plazas)
-                 AND rf.exit_plaza_previous IN (SELECT plaza_name FROM instate_plazas)
-            THEN 'In-state'
-            ELSE 'Out-state'
+            -- Original logic using address_to_miles / instate_plazas is disabled:
+            -- WHEN rf.exit_plaza IN (SELECT plaza_name FROM instate_plazas)
+            --      AND rf.exit_plaza_previous IN (SELECT plaza_name FROM instate_plazas)
+            -- THEN 'In-state'
+            ELSE 'Unknown'
         END as route_instate
         
     FROM route_features rf
@@ -88,11 +85,12 @@ check_route AS (
 distance_features AS (
     SELECT
         cr.*,
-        dl.expected_travel_distance_miles as distance_miles
+        -- distance_miles derived from address_to_miles is disabled; keep NULL
+        NULL as distance_miles
     FROM check_route cr
-    LEFT JOIN distance_lookup dl
-        ON cr.exit_plaza_previous = dl.origin_plaza
-        AND cr.exit_plaza = dl.destination_plaza
+    -- LEFT JOIN distance_lookup dl
+    --     ON cr.exit_plaza_previous = dl.origin_plaza
+    --     AND cr.exit_plaza = dl.destination_plaza
 ),
 
 -- Calculate velocity and impossible travel features

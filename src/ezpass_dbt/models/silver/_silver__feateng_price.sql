@@ -4,6 +4,7 @@
 ) }}
 
 WITH base_features AS (
+    -- Route-level features (now safe: address_to_miles-dependent logic is commented out in _silver__feateng_route)
     SELECT * FROM {{ ref('_silver__feateng_route') }}
 ),
 

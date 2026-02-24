@@ -1,5 +1,6 @@
-version: '3.8'
-
+# Use repo root .env so GCS_BUCKET_NAME etc. are correct (Compose otherwise uses deploy/ or host env):
+#   docker compose --env-file .env -f deploy/docker-compose.yaml up -d
+# If you change .env, recreate containers: down then up -d (or up -d --force-recreate)
 x-airflow-common:
   &airflow-common
   # Build from Dockerfile instead of using base image
@@ -18,8 +19,8 @@ x-airflow-common:
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
     AIRFLOW__CORE__DEFAULT_TIMEZONE: America/New_York
     TZ: America/New_York
-    # Load environment variables from .env
-    GCS_BUCKET_NAME: ${GCS_BUCKET_NAME}
+    # From repo root .env when you use: docker compose --env-file .env -f deploy/docker-compose.yaml
+    GCS_BUCKET_NAME: ${GCS_BUCKET_NAME:-ezpass_bucket}
     GCS_PROJECT_ID: ${GCS_PROJECT_ID}
     GCS_FOLDER_PREFIX_RAW: ${GCS_FOLDER_PREFIX_RAW:-data/raw/}
     BIGQUERY_DATASET: ${BIGQUERY_DATASET:-ezpass_data}
@@ -38,14 +39,16 @@ x-airflow-common:
     MLFLOW_ARTIFACT_DIR: ${MLFLOW_ARTIFACT_DIR:-/opt/airflow/mlflow-artifacts}
     USE_MLFLOW: ${USE_MLFLOW:-true}
   volumes:
-    - ./src/airflow/dags:/opt/airflow/dags
-    - ./logs/airflow:/opt/airflow/logs
-    - ./src/airflow/plugins:/opt/airflow/plugins
-    - ./src/airflow/config:/opt/airflow/config
-    - ./src/ml_train:/opt/airflow/ml_train
-    - ./data:/opt/airflow/data
-    - ./.env:/opt/airflow/.env
-    - ./src/ezpass_dbt:/opt/airflow/dbt_project
+    # Paths relative to deploy/ (compose file dir), so ../ = repo root
+    - ../src/airflow/dags:/opt/airflow/dags
+    - ../logs/airflow:/opt/airflow/logs
+    - ../src/airflow/plugins:/opt/airflow/plugins
+    - ../src/airflow/config:/opt/airflow/config
+    - ../secrets/gcp-key.json:/opt/airflow/config/gcp-key.json:ro
+    - ../src/ml_train:/opt/airflow/ml_train
+    - ../data:/opt/airflow/data
+    - ../.env:/opt/airflow/.env
+    - ../src/ezpass_dbt:/opt/airflow/dbt_project
     # MLflow tracking and artifacts (persist across container restarts)
     - mlflow-tracking:/opt/airflow/mlflow-tracking
     - mlflow-artifacts:/opt/airflow/mlflow-artifacts
@@ -187,7 +190,7 @@ services:
       _PIP_ADDITIONAL_REQUIREMENTS: ''
     user: "0:0"
     volumes:
-      - ./src/airflow:/sources
+      - ../src/airflow:/sources
 
   mlflow-ui:
     <<: *airflow-common
@@ -221,8 +224,7 @@ services:
       # Use mounted service account key inside the container
       GOOGLE_APPLICATION_CREDENTIALS: /app/gcp-key.json
     volumes:
-      # Mount backend GCP key into the container (read-only)
-      - ./backend/keys/gcp-key.json:/app/gcp-key.json:ro
+      - ../secrets/gcp-key.json:/app/gcp-key.json:ro
     ports:
       # Expose combined backend+frontend on localhost:5001
       - "5001:8080"

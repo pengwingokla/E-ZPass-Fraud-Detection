@@ -399,7 +399,7 @@ class FraudDetectionTrainer:
         import pandas as pd
         
         client = bigquery.Client(project=self.project_id)
-        table_id = f"{self.project_id}.ezpass_data.model_training_metrics"
+        table_id = f"{self.project_id}.ezpass_data.training_metrics"
         
         model_id = f"{model_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
@@ -549,7 +549,7 @@ class FraudDetectionTrainer:
             
             # 7. Write predictions to BigQuery
             print("\n[7/7] Writing predictions to BigQuery")
-            output_table = f"{self.project_id}.ezpass_data.fraud_predictions"
+            output_table = f"{self.project_id}.ezpass_data.pred_raw"
             self.write_predictions_to_bigquery(df_original, predictions, anomaly_scores, output_table)
             
             if self.use_mlflow:

@@ -1,8 +1,10 @@
 version: 2
 
+# database (BigQuery project) must match the project your Airflow service account can access.
+# Set GCS_PROJECT_ID in .env; dbt uses it so bronze/address_to_miles are read from that project.
 sources:
   - name: raw
-    database: njc-ezpass
+    database: "{{ env_var('GCS_PROJECT_ID', 'ezpass-fd') }}"
     schema: ezpass_data
     description: Raw EZ-Pass transaction data loaded from GCS by Airflow
     
@@ -67,7 +69,7 @@ sources:
           - name: source_file
             description: Original CSV filename
 
-      - name: holidays
+      - name: _holidays
         description: BigQuery with list of NJ Courts Holidays from 2025 to 2035
       
       - name: address_to_miles

@@ -6,7 +6,7 @@
 WITH predictions AS (
     SELECT 
         *
-    FROM {{ source('ezpass_predictions', 'fraud_predictions') }}
+    FROM {{ source('ezpass_predictions', 'pred_raw') }}
 ),
 
 -- Calculate percentiles for anomaly score distribution

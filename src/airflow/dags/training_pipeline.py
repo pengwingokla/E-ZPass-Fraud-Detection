@@ -70,7 +70,7 @@ def create_training_metrics_table():
         raise ValueError("GCS_PROJECT_ID must be set")
     
     client = bigquery.Client(project=GCS_PROJECT_ID)
-    table_id = f"{GCS_PROJECT_ID}.{BIGQUERY_DATASET}.model_training_metrics"
+    table_id = f"{GCS_PROJECT_ID}.{BIGQUERY_DATASET}.training_metrics"
     
     schema = [
         bigquery.SchemaField("model_id", "STRING"),
@@ -103,7 +103,7 @@ def create_training_metrics_table():
     return table_id
 
 def delete_predictions_table():
-    """Delete fraud_predictions table if it exists"""
+    """Delete pred_raw table if it exists"""
     from google.cloud import bigquery
     from google.api_core import exceptions
     
@@ -111,7 +111,7 @@ def delete_predictions_table():
         raise ValueError("GCS_PROJECT_ID must be set")
     
     client = bigquery.Client(project=GCS_PROJECT_ID)
-    table_id = f"{GCS_PROJECT_ID}.{BIGQUERY_DATASET}.fraud_predictions"
+    table_id = f"{GCS_PROJECT_ID}.{BIGQUERY_DATASET}.pred_raw"
     
     try:
         client.delete_table(table_id, not_found_ok=True)
@@ -129,14 +129,14 @@ def delete_predictions_table():
     return table_id
 
 def create_predictions_table():
-    """Create fraud_predictions table if it doesn't exist"""
+    """Create pred_raw table if it doesn't exist"""
     from google.cloud import bigquery
     
     if not GCS_PROJECT_ID:
         raise ValueError("GCS_PROJECT_ID must be set")
     
     client = bigquery.Client(project=GCS_PROJECT_ID)
-    table_id = f"{GCS_PROJECT_ID}.{BIGQUERY_DATASET}.fraud_predictions"
+    table_id = f"{GCS_PROJECT_ID}.{BIGQUERY_DATASET}.pred_raw"
     
     # Store predictions with key features for ML training
     schema = [
