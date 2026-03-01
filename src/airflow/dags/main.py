@@ -771,7 +771,7 @@ def create_ml_dataset(**context):
     
     return dataset_id
 
-def create_training_metrics_table(**context):
+def create_metrics_training_table(**context):
     """Create table to track training metrics over time"""
     from google.cloud import bigquery
     
@@ -779,7 +779,7 @@ def create_training_metrics_table(**context):
         raise ValueError("GCS_PROJECT_ID must be set")
     
     client = bigquery.Client(project=GCS_PROJECT_ID)
-    table_id = f"{GCS_PROJECT_ID}.{BIGQUERY_DATASET}.training_metrics"
+    table_id = f"{GCS_PROJECT_ID}.{BIGQUERY_DATASET}._metrics_training"
     
     schema = [
         bigquery.SchemaField("model_id", "STRING"),
@@ -936,6 +936,59 @@ def run_fraud_training(**context):
     
     trainer.run_training_pipeline()
 
+def calculate_potential_loss():
+    """
+    Pre-calculate dashboard and loss metrics from master_viz.
+
+    Writes two tables:
+    1. _stats: one summary row with total_alert_all_time, total_amount_all_time,
+       loss_all_time, plus dashboard fields (API reads this).
+    2. _stats_month: one row per month with total_transactions, total_alerts, total_loss.
+
+    total_alert_all_time = count where is_anomaly = 1 over all time.
+    Loss = sum(amount) where is_anomaly = 1.
+    """
+    from google.cloud import bigquery
+
+    if not GCS_PROJECT_ID:
+        raise ValueError("GCS_PROJECT_ID is required to run loss calculation")
+
+    client = bigquery.Client(project=GCS_PROJECT_ID)
+    source_table = f"{GCS_PROJECT_ID}.{BIGQUERY_DATASET}.master_viz"
+    target_table = f"{GCS_PROJECT_ID}.{BIGQUERY_DATASET}._stats"
+    target_by_month = f"{GCS_PROJECT_ID}.{BIGQUERY_DATASET}._stats_month"
+
+    # Summary row: all-time and YTD alerts/loss + dashboard fields
+    summary_query = f"""
+        CREATE OR REPLACE TABLE `{target_table}` AS
+        SELECT
+            CURRENT_DATE() AS as_of_date,
+            COUNT(*) AS total_transactions,
+            COALESCE(SUM(CASE WHEN is_anomaly = 1 THEN amount ELSE 0 END), 0) AS total_amount_all_time,
+            COALESCE(SUM(CASE WHEN is_anomaly = 1 THEN 1 ELSE 0 END), 0) AS total_alert_all_time,
+            COALESCE(SUM(CASE WHEN is_anomaly = 1 THEN amount ELSE 0 END), 0) AS loss_all_time
+        FROM `{source_table}`
+    """
+    client.query(summary_query).result()
+
+    # Per-month: one row per month with total_transactions, total_alerts, total_loss
+    by_month_query = f"""
+        CREATE OR REPLACE TABLE `{target_by_month}` AS
+        SELECT
+            CURRENT_DATE() AS as_of_date,
+            FORMAT_DATE('%Y-%m', transaction_date) AS month,
+            COUNT(*) AS total_transactions,
+            COALESCE(SUM(CASE WHEN is_anomaly = 1 THEN 1 ELSE 0 END), 0) AS total_alerts,
+            COALESCE(SUM(CASE WHEN is_anomaly = 1 THEN amount ELSE 0 END), 0) AS total_loss
+        FROM `{source_table}`
+        WHERE transaction_date IS NOT NULL
+        GROUP BY FORMAT_DATE('%Y-%m', transaction_date)
+        ORDER BY month DESC
+    """
+    client.query(by_month_query).result()
+
+    return target_table
+
 # ============================================================================
 # DAG DEFINITION
 # ============================================================================
@@ -1077,6 +1130,11 @@ with DAG(
             'PATH': '/home/airflow/.local/bin:/usr/local/bin:/usr/bin:/bin',
         }
     )
+
+    calculate_loss_task = PythonOperator(
+        task_id='calculate_loss',
+        python_callable=calculate_potential_loss
+    )
     
     # ========================================================================
     # PHASE 5: ML TRAINING PIPELINE
@@ -1086,9 +1144,9 @@ with DAG(
         python_callable=create_ml_dataset
     )
 
-    create_training_metrics_table_task = PythonOperator(
-        task_id='create_training_metrics_table',
-        python_callable=create_training_metrics_table
+    create_metrics_training_table_task = PythonOperator(
+        task_id='create_metrics_training_table',
+        python_callable=create_metrics_training_table
     )
     
     delete_predictions_table_task = PythonOperator(
@@ -1130,7 +1188,7 @@ with DAG(
             'PATH': '/home/airflow/.local/bin:/usr/local/bin:/usr/bin:/bin',
         }
     )
-    
+
     # ========================================================================
     # TASK DEPENDENCIES
     # ========================================================================
@@ -1144,8 +1202,7 @@ with DAG(
     verify_BQ >> dbt_install_deps >> dbt_run_silver >> dbt_run_gold_base >> dbt_run_gold_train >> dbt_run_gold
     
     # Phase 5: ML training pipeline
-    dbt_run_gold >> create_ml_dataset_task >> create_training_metrics_table_task >> delete_predictions_table_task >> create_predictions_table_task >> train_fraud_model_task
+    dbt_run_gold >> create_ml_dataset_task >> create_metrics_training_table_task >> delete_predictions_table_task >> create_predictions_table_task >> train_fraud_model_task
     
     # Phase 6: DBT post-training pipeline
-    train_fraud_model_task >> dbt_run_pred_viz >> dbt_run_master_viz
-
+    train_fraud_model_task >> dbt_run_pred_viz >> dbt_run_master_viz >> calculate_loss_task

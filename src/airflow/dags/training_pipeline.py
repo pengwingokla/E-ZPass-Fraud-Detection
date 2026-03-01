@@ -62,7 +62,7 @@ def create_dataset():
     
     return dataset_id
 
-def create_training_metrics_table():
+def create_metrics_training_table():
     """Create table to track training metrics over time"""
     from google.cloud import bigquery
     
@@ -70,7 +70,7 @@ def create_training_metrics_table():
         raise ValueError("GCS_PROJECT_ID must be set")
     
     client = bigquery.Client(project=GCS_PROJECT_ID)
-    table_id = f"{GCS_PROJECT_ID}.{BIGQUERY_DATASET}.training_metrics"
+    table_id = f"{GCS_PROJECT_ID}.{BIGQUERY_DATASET}._metrics_training"
     
     schema = [
         bigquery.SchemaField("model_id", "STRING"),
@@ -244,9 +244,9 @@ with DAG(
         python_callable=create_dataset
     )
 
-    create_training_metrics_table_task = PythonOperator(
-        task_id='create_training_metrics_table',
-        python_callable=create_training_metrics_table
+    create_metrics_training_table_task = PythonOperator(
+        task_id='create_metrics_training_table',
+        python_callable=create_metrics_training_table
     )
     
     delete_predictions_table_task = PythonOperator(
@@ -264,4 +264,4 @@ with DAG(
         python_callable=run_fraud_training
     )
     
-    delete_predictions_table_task >> create_dataset_task >> create_training_metrics_table_task >> create_predictions_table_task >> train_fraud_model_task
+    delete_predictions_table_task >> create_dataset_task >> create_metrics_training_table_task >> create_predictions_table_task >> train_fraud_model_task

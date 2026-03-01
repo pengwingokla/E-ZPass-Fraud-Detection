@@ -391,7 +391,7 @@ class FraudDetectionTrainer:
             print(f"  Anomalies detected: {sum(final_df['is_anomaly']):,}")
             print(f"  Anomaly rate: {sum(final_df['is_anomaly']) / len(final_df) * 100:.2f}%")
     
-    def log_training_metrics(self, metrics, model_type="isolation_forest"):
+    def log__metrics_training(self, metrics, model_type="isolation_forest"):
         """Save training metrics to BigQuery"""
         from google.cloud import bigquery
         from google.api_core import exceptions
@@ -399,7 +399,7 @@ class FraudDetectionTrainer:
         import pandas as pd
         
         client = bigquery.Client(project=self.project_id)
-        table_id = f"{self.project_id}.ezpass_data.training_metrics"
+        table_id = f"{self.project_id}.ezpass_data._metrics_training"
         
         model_id = f"{model_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
@@ -536,7 +536,7 @@ class FraudDetectionTrainer:
             
             # 5. Log metrics to BigQuery (keep existing functionality)
             print("\n[5/7] Logging training metrics to BigQuery")
-            self.log_training_metrics(metrics, "isolation_forest")
+            self.log__metrics_training(metrics, "isolation_forest")
             
             # 6. Save artifacts (for backward compatibility)
             print("\n[6/7] Saving model artifacts locally")

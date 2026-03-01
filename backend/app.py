@@ -3,7 +3,7 @@ import os
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
-from config import client, get_table, table_name as TABLE_NAME
+from config import client, get_metrics_table, get_master_viz_table, get_stats_month_table
 
 # Initialize Flask app
 # If static folder exists (from Docker build), serve frontend from there
@@ -30,33 +30,20 @@ def all_transactions():
         status_filter = request.args.get('status', '').strip().replace("'", "''")
         category_filter = request.args.get('category', '').strip().replace("'", "''")
         
-        # Build WHERE clause
+        # Build WHERE clause (Transactions tab: master_viz columns only)
         where_conditions = []
-        
         if search:
-            # Handle NULL values properly in BigQuery using COALESCE
-            # Search condition depends on table type
-            if TABLE_NAME == "master_viz":
-                where_conditions.append(f"(LOWER(COALESCE(CAST(transaction_id AS STRING), '')) LIKE LOWER('%{search}%') OR LOWER(COALESCE(tag_plate_number, '')) LIKE LOWER('%{search}%') OR LOWER(COALESCE(CAST(ml_predicted_category AS STRING), '')) LIKE LOWER('%{search}%'))")
-            else:
-                # gold_automation table
-                where_conditions.append(f"(LOWER(COALESCE(CAST(transaction_id AS STRING), '')) LIKE LOWER('%{search}%') OR LOWER(COALESCE(tag_plate_number, '')) LIKE LOWER('%{search}%') OR LOWER(COALESCE(CAST(threat_severity AS STRING), '')) LIKE LOWER('%{search}%'))")
-        
+            where_conditions.append(f"(LOWER(COALESCE(CAST(transaction_id AS STRING), '')) LIKE LOWER('%{search}%') OR LOWER(COALESCE(tag_plate_number, '')) LIKE LOWER('%{search}%') OR LOWER(COALESCE(CAST(ml_predicted_category AS STRING), '')) LIKE LOWER('%{search}%'))")
         if status_filter and status_filter != 'all':
             where_conditions.append(f"status = '{status_filter}'")
-        
         if category_filter and category_filter != 'all':
-            if TABLE_NAME == "master_viz":
-                where_conditions.append(f"LOWER(ml_predicted_category) = LOWER('{category_filter}')")
-            else:
-                where_conditions.append(f"LOWER(threat_severity) = LOWER('{category_filter}')")
-        
+            where_conditions.append(f"LOWER(ml_predicted_category) = LOWER('{category_filter}')")
         where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
         
-        # Build query with pagination
+        # Transactions tab: master_viz table only
         query = f"""
         SELECT * 
-        FROM {get_table()}
+        FROM {get_master_viz_table()}
         {where_clause}
         ORDER BY transaction_date DESC
         LIMIT {limit}
@@ -83,32 +70,20 @@ def transactions_count():
         status_filter = request.args.get('status', '').strip().replace("'", "''")
         category_filter = request.args.get('category', '').strip().replace("'", "''")
         
-        # Build WHERE clause (same logic as all_transactions)
+        # Build WHERE clause (same as all_transactions); Transactions tab: master_viz only
         where_conditions = []
-        
         if search:
-            # Handle NULL values properly in BigQuery using COALESCE
-            # Search condition depends on table type
-            if TABLE_NAME == "master_viz":
-                where_conditions.append(f"(LOWER(COALESCE(CAST(transaction_id AS STRING), '')) LIKE LOWER('%{search}%') OR LOWER(COALESCE(tag_plate_number, '')) LIKE LOWER('%{search}%') OR LOWER(COALESCE(CAST(ml_predicted_category AS STRING), '')) LIKE LOWER('%{search}%'))")
-            else:
-                # gold_automation table
-                where_conditions.append(f"(LOWER(COALESCE(CAST(transaction_id AS STRING), '')) LIKE LOWER('%{search}%') OR LOWER(COALESCE(tag_plate_number, '')) LIKE LOWER('%{search}%') OR LOWER(COALESCE(CAST(threat_severity AS STRING), '')) LIKE LOWER('%{search}%'))")
-        
+            where_conditions.append(f"(LOWER(COALESCE(CAST(transaction_id AS STRING), '')) LIKE LOWER('%{search}%') OR LOWER(COALESCE(tag_plate_number, '')) LIKE LOWER('%{search}%') OR LOWER(COALESCE(CAST(ml_predicted_category AS STRING), '')) LIKE LOWER('%{search}%'))")
         if status_filter and status_filter != 'all':
             where_conditions.append(f"status = '{status_filter}'")
-        
         if category_filter and category_filter != 'all':
-            if TABLE_NAME == "master_viz":
-                where_conditions.append(f"LOWER(ml_predicted_category) = LOWER('{category_filter}')")
-            else:
-                where_conditions.append(f"LOWER(threat_severity) = LOWER('{category_filter}')")
-        
+            where_conditions.append(f"LOWER(ml_predicted_category) = LOWER('{category_filter}')")
         where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
         
+        # Transactions tab: always use master_viz table
         query = f"""
         SELECT COUNT(*) AS total
-        FROM {get_table()}
+        FROM {get_master_viz_table()}
         {where_clause}
         """
         
@@ -123,29 +98,17 @@ def transactions_count():
         print(f"Traceback: {error_trace}")
         return jsonify({"total": 0, "error": str(e), "query": query if 'query' in locals() else "N/A"}), 500
 
-#Get flagged or investigating transactions (Recent Alerts)
+# Get flagged or investigating transactions (Recent Alerts). Transactions tab: master_viz only.
 @app.route("/api/transactions/alerts")
 def alerts():
     try:
-        if TABLE_NAME == "master_viz":
-            query = f"""
-                SELECT * 
-                FROM {get_table()} 
-                WHERE is_anomaly = 1
-                ORDER BY transaction_date DESC
-                LIMIT 100
-            """
-        elif TABLE_NAME == "gold_automation":
-            query = f"""
-                SELECT * 
-                FROM {get_table()} 
-                WHERE flag_fraud = TRUE
-                ORDER BY transaction_date DESC
-                LIMIT 100
-            """
-        else:
-            return jsonify({"error": "Unsupported table"}), 400
-
+        query = f"""
+            SELECT * 
+            FROM {get_master_viz_table()} 
+            WHERE is_anomaly = 1
+            ORDER BY transaction_date DESC
+            LIMIT 100
+        """
         results = client.query(query).result()
         rows = [dict(row) for row in results]
         return jsonify({"data": rows})
@@ -155,56 +118,31 @@ def alerts():
         return jsonify({"data": [], "error": str(e)}), 500
 
 
-#Get recent flagged transactions for homepage card
+# Recent flagged transactions for homepage card. Transactions tab: master_viz only.
 @app.route("/api/transactions/recent-flagged")
 def recent_flagged():
     try:
-        if TABLE_NAME == "master_viz":
-            query = f"""
-                SELECT 
-                    transaction_id,
-                    transaction_date,
-                    tag_plate_number,
-                    agency,
-                    amount,
-                    status,
-                    ml_predicted_category,
-                    is_anomaly
-                FROM {get_table()} 
-                WHERE (status = 'Needs Review' OR is_anomaly = 1)
-                ORDER BY transaction_date DESC
-                LIMIT 3
-            """
-        elif TABLE_NAME == "gold_automation":
-            query = f"""
-                SELECT 
-                    transaction_id,
-                    transaction_date,
-                    tag_plate_number,
-                    agency,
-                    amount,
-                    status,
-                    threat_severity,
-                    flag_fraud
-                FROM {get_table()} 
-                WHERE (status = 'Needs Review' OR flag_fraud = TRUE)
-                ORDER BY transaction_date DESC
-                LIMIT 3
-            """
-        else:
-            return jsonify({"error": "Unsupported table"}), 400
-
+        query = f"""
+            SELECT 
+                transaction_id,
+                transaction_date,
+                tag_plate_number,
+                agency,
+                amount,
+                status,
+                ml_predicted_category,
+                is_anomaly
+            FROM {get_master_viz_table()} 
+            WHERE (status = 'Needs Review' OR is_anomaly = 1)
+            ORDER BY transaction_date DESC
+            LIMIT 3
+        """
         results = client.query(query).result()
         rows = []
 
         for row in results:
             status = row.get('status')
-
-            # Map category column depending on table
-            category = row.get('ml_predicted_category') if TABLE_NAME == "master_viz" else row.get('threat_severity')
-            if not category:
-                category = 'Anomaly Detected'
-
+            category = row.get('ml_predicted_category') or 'Anomaly Detected'
             rows.append({
                 'id': row.get('transaction_id'),
                 'transaction_id': row.get('transaction_id'),
@@ -215,7 +153,7 @@ def recent_flagged():
                 'amount': float(row.get('amount')) if row.get('amount') is not None else 0.0,
                 'status': status,
                 'category': category,
-                'is_anomaly': bool(row.get('is_anomaly') if TABLE_NAME == "master_viz" else row.get('flag_fraud'))
+                'is_anomaly': bool(row.get('is_anomaly'))
             })
 
         return jsonify({"data": rows})
@@ -225,139 +163,96 @@ def recent_flagged():
         return jsonify({"data": [], "error": str(e)}), 500
 
 
-#Aggregated metrics for dashboard cards
+# Dashboard stats: from _stats only.
 @app.route("/api/metrics")
 def metrics():
     try:
-        if TABLE_NAME == "master_viz":
-            query = f"""
-                SELECT
-                    COUNT(*) AS total_transactions,
-                    SUM(CASE WHEN is_anomaly = 1 THEN 1 ELSE 0 END) AS total_flagged,
-                    SUM(CASE WHEN is_anomaly = 1 THEN amount ELSE 0 END) AS total_amount,
-                    SUM(CASE 
-                            WHEN is_anomaly = 1 
-                                 AND EXTRACT(YEAR FROM transaction_date) = EXTRACT(YEAR FROM CURRENT_DATE())
-                            THEN amount 
-                            ELSE 0 
-                        END) AS potential_loss_ytd,
-                    SUM(CASE WHEN is_anomaly = 1 
-                             AND EXTRACT(YEAR FROM transaction_date) = EXTRACT(YEAR FROM CURRENT_DATE()) THEN 1 ELSE 0 END) AS total_alerts_ytd,
-                    SUM(CASE 
-                            WHEN ml_predicted_category IN ('Critical Risk', 'High Risk')
-                                 AND EXTRACT(YEAR FROM transaction_date) = EXTRACT(YEAR FROM CURRENT_DATE())
-                                 AND EXTRACT(MONTH FROM transaction_date) = EXTRACT(MONTH FROM CURRENT_DATE())
-                            THEN 1 
-                            ELSE 0 
-                        END) AS detected_frauds_current_month
-                FROM {get_table()}
-            """
-        elif TABLE_NAME == "gold_automation":
-            query = f"""
-                SELECT
-                    COUNT(*) AS total_transactions,
-                    SUM(CASE WHEN flag_fraud = TRUE THEN 1 ELSE 0 END) AS total_flagged,
-                    SUM(CASE WHEN flag_fraud = TRUE THEN amount ELSE 0 END) AS total_amount,
-                    SUM(CASE 
-                            WHEN flag_fraud = TRUE 
-                                 AND EXTRACT(YEAR FROM transaction_date) = EXTRACT(YEAR FROM CURRENT_DATE())
-                            THEN amount 
-                            ELSE 0 
-                        END) AS potential_loss_ytd,
-                    SUM(CASE WHEN flag_fraud = TRUE 
-                             AND EXTRACT(YEAR FROM transaction_date) = EXTRACT(YEAR FROM CURRENT_DATE()) THEN 1 ELSE 0 END) AS total_alerts_ytd,
-                    SUM(CASE 
-                            WHEN threat_severity IN ('Critical Risk', 'High Risk')
-                                 AND EXTRACT(YEAR FROM transaction_date) = EXTRACT(YEAR FROM CURRENT_DATE())
-                                 AND EXTRACT(MONTH FROM transaction_date) = EXTRACT(MONTH FROM CURRENT_DATE())
-                            THEN 1 
-                            ELSE 0 
-                        END) AS detected_frauds_current_month
-                FROM {get_table()}
-            """
-        else:
-            return jsonify({"error": "Unsupported table"}), 400
-
+        query = f"""
+            SELECT
+                as_of_date,
+                total_transactions,
+                total_amount_all_time,
+                loss_all_time,
+                total_alert_all_time
+            FROM {get_metrics_table()}
+            ORDER BY as_of_date DESC
+            LIMIT 1
+        """
         results = client.query(query).result()
-        metrics = dict(next(results))
+        row = next(results, None)
+        if row is None:
+            return jsonify({
+                "total_transactions": 0,
+                "total_amount_all_time": 0,
+                "total_alert_all_time": 0,
+                "loss_all_time": 0,
+            })
+        m = dict(row)
         return jsonify({
-            "total_transactions": int(metrics.get("total_transactions", 0)),
-            "total_flagged": int(metrics.get("total_flagged", 0)),
-            "total_amount": float(metrics.get("total_amount", 0)),
-            "total_alerts_ytd": int(metrics.get("total_alerts_ytd", 0)),
-            "detected_frauds_current_month": int(metrics.get("detected_frauds_current_month", 0)),
-            "potential_loss_ytd": float(metrics.get("potential_loss_ytd", 0))
+            "total_transactions": int(m.get("total_transactions", 0)),
+            "total_amount_all_time": float(m.get("total_amount_all_time", 0)),
+            "total_alert_all_time": int(m.get("total_alert_all_time", 0)),
+            "loss_all_time": float(m.get("loss_all_time") or 0),
         })
-
     except Exception as e:
         print(f"Error fetching metrics: {str(e)}")
         return jsonify({
             "total_transactions": 0,
-            "total_flagged": 0,
-            "total_amount": 0,
-            "total_alerts_ytd": 0,
-            "detected_frauds_current_month": 0,
-            "potential_loss_ytd": 0
+            "total_amount_all_time": 0,
+            "total_alert_all_time": 0,
+            "loss_all_time": 0,
         }), 500
 
 
-#Fraud by Category for chart
+# Latest month stats from _stats_month (for Detected Frauds card)
+@app.route("/api/metrics/latest-month")
+def metrics_latest_month():
+    try:
+        query = f"""
+            SELECT month, total_alerts
+            FROM {get_stats_month_table()}
+            ORDER BY month DESC
+            LIMIT 1
+        """
+        results = client.query(query).result()
+        row = next(results, None)
+        if row is None:
+            return jsonify({"month": None, "total_alerts": 0})
+        return jsonify({
+            "month": str(row["month"]) if row["month"] else None,
+            "total_alerts": int(row["total_alerts"] or 0),
+        })
+    except Exception as e:
+        print(f"Error fetching latest month metrics: {str(e)}")
+        return jsonify({"month": None, "total_alerts": 0, "error": str(e)}), 500
+
+
+# Fraud by Category for chart (master_viz only)
 @app.route("/api/charts/category")
 def category_chart():
-
-    # MASTER_VIZ VERSION (your original logic)
-    if TABLE_NAME == "master_viz":
-        query = f"""
-            WITH unpivoted AS (
-                SELECT
-                    f.flag_label AS category
-                FROM {get_table()},
-                UNNEST([
-                    STRUCT('Rush Hour' AS flag_label, flag_rush_hour AS flag_value),
-                    STRUCT('Weekend' AS flag_label, flag_is_weekend AS flag_value),
-                    STRUCT('Holiday' AS flag_label, flag_is_holiday AS flag_value),
-                    STRUCT('Overlapping Journey' AS flag_label, flag_overlapping_journey AS flag_value),
-                    STRUCT('Driver Amount Outlier' AS flag_label, flag_driver_amount_outlier AS flag_value),
-                    STRUCT('Route Amount Outlier' AS flag_label, flag_route_amount_outlier AS flag_value),
-                    STRUCT('Amount Unusually High' AS flag_label, flag_amount_unusually_high AS flag_value),
-                    STRUCT('Driver Spend Spike' AS flag_label, flag_driver_spend_spike AS flag_value)
-                ]) AS f
-                WHERE is_anomaly = 1
-                    AND f.flag_value IS TRUE
-            )
-            SELECT category, COUNT(*) AS count
-            FROM unpivoted
-            GROUP BY category
-            ORDER BY count DESC
-        """
-
-    # GOLD_AUTOMATION VERSION (based on your columns)
-    elif TABLE_NAME == "gold_automation":
-        # Filter by flag_fraud first, then show the contributing flags (excluding flag_fraud itself)
-        query = f"""
-            WITH unpivoted AS (
-                SELECT
-                    f.flag_label AS category
-                FROM {get_table()},
-                UNNEST([
-                    STRUCT('Vehicle Type' AS flag_label, flag_vehicle_type AS flag_value),
-                    STRUCT('Amount > 29' AS flag_label, flag_amount_gt_29 AS flag_value),
-                    STRUCT('Out of State' AS flag_label, flag_is_out_of_state AS flag_value),
-                    STRUCT('Weekend' AS flag_label, flag_is_weekend AS flag_value),
-                    STRUCT('Holiday' AS flag_label, flag_is_holiday AS flag_value)
-                ]) AS f
-                WHERE flag_fraud = TRUE
-                    AND f.flag_value IS TRUE
-            )
-            SELECT category, COUNT(*) AS count
-            FROM unpivoted
-            GROUP BY category
-            ORDER BY count DESC
-        """
-
-    else:
-        return jsonify({"error": "Unsupported table"}), 400
-
+    query = f"""
+        WITH unpivoted AS (
+            SELECT
+                f.flag_label AS category
+            FROM {get_master_viz_table()},
+            UNNEST([
+                STRUCT('Rush Hour' AS flag_label, flag_rush_hour AS flag_value),
+                STRUCT('Weekend' AS flag_label, flag_is_weekend AS flag_value),
+                STRUCT('Holiday' AS flag_label, flag_is_holiday AS flag_value),
+                STRUCT('Overlapping Journey' AS flag_label, flag_overlapping_journey AS flag_value),
+                STRUCT('Driver Amount Outlier' AS flag_label, flag_driver_amount_outlier AS flag_value),
+                STRUCT('Route Amount Outlier' AS flag_label, flag_route_amount_outlier AS flag_value),
+                STRUCT('Amount Unusually High' AS flag_label, flag_amount_unusually_high AS flag_value),
+                STRUCT('Driver Spend Spike' AS flag_label, flag_driver_spend_spike AS flag_value)
+            ]) AS f
+            WHERE is_anomaly = 1
+                AND f.flag_value IS TRUE
+        )
+        SELECT category, COUNT(*) AS count
+        FROM unpivoted
+        GROUP BY category
+        ORDER BY count DESC
+    """
     # Run the query
     try:
         results = client.query(query).result()
@@ -369,37 +264,18 @@ def category_chart():
 
 
 
-#Threat Severity for chart
+# Threat Severity for chart (master_viz only)
 @app.route("/api/charts/severity")
 def severity_chart():
-
-    # MASTER_VIZ version (original behavior)
-    if TABLE_NAME == "master_viz":
-        query = f"""
-            SELECT 
-                ml_predicted_category AS severity,
-                COUNT(*) AS count
-            FROM {get_table()}
-            WHERE ml_predicted_category IS NOT NULL
-            GROUP BY ml_predicted_category
-            ORDER BY count DESC
-        """
-
-    # GOLD_AUTOMATION version (uses threat_severity instead)
-    elif TABLE_NAME == "gold_automation":
-        query = f"""
-            SELECT 
-                threat_severity AS severity,
-                COUNT(*) AS count
-            FROM {get_table()}
-            WHERE threat_severity IS NOT NULL
-            GROUP BY threat_severity
-            ORDER BY count DESC
-        """
-
-    else:
-        return jsonify({"error": "Unsupported table"}), 400
-
+    query = f"""
+        SELECT 
+            ml_predicted_category AS severity,
+            COUNT(*) AS count
+        FROM {get_master_viz_table()}
+        WHERE ml_predicted_category IS NOT NULL
+        GROUP BY ml_predicted_category
+        ORDER BY count DESC
+    """
     # Run query
     try:
         results = client.query(query).result()
@@ -411,58 +287,30 @@ def severity_chart():
 
 
 
-#Monthly transaction analysis for bar chart
+# Monthly transaction analysis for bar chart (_stats_month: month as YYYY-MM)
 @app.route("/api/charts/monthly")
 def monthly_chart():
     try:
-
-        # MASTER_VIZ logic
-        if TABLE_NAME == "master_viz":
-            query = f"""
-                SELECT 
-                    FORMAT_DATE('%b %Y', DATE(transaction_date)) AS month,
-                    EXTRACT(YEAR FROM DATE(transaction_date)) AS year,
-                    EXTRACT(MONTH FROM DATE(transaction_date)) AS month_num,
-                    COUNT(*) AS total_transactions,
-                    SUM(CASE WHEN is_anomaly = 1 THEN 1 ELSE 0 END) AS fraud_alerts
-                FROM {get_table()}
-                WHERE transaction_date IS NOT NULL
-                GROUP BY year, month_num, month
-                ORDER BY year DESC, month_num DESC
-                LIMIT 12
-            """
-
-        # GOLD_AUTOMATION logic
-        elif TABLE_NAME == "gold_automation":
-            query = f"""
-                SELECT 
-                    FORMAT_DATE('%b %Y', DATE(transaction_date)) AS month,
-                    EXTRACT(YEAR FROM DATE(transaction_date)) AS year,
-                    EXTRACT(MONTH FROM DATE(transaction_date)) AS month_num,
-                    COUNT(*) AS total_transactions,
-                    SUM(CASE WHEN flag_fraud = TRUE THEN 1 ELSE 0 END) AS fraud_alerts
-                FROM {get_table()}
-                WHERE transaction_date IS NOT NULL
-                GROUP BY year, month_num, month
-                ORDER BY year DESC, month_num DESC
-                LIMIT 12
-            """
-
-        else:
-            return jsonify({"error": "Unsupported table"}), 400
-
-        # Execute query
+        query = f"""
+            SELECT
+                month,
+                total_transactions,
+                total_alerts,
+                total_loss
+            FROM {get_stats_month_table()}
+            ORDER BY month DESC
+            LIMIT 12
+        """
         results = client.query(query).result()
-        
+
         data = [{
-            "month": row["month"],
-            "year": int(row["year"]),
-            "month_num": int(row["month_num"]),
-            "total_transactions": int(row["total_transactions"]),
-            "fraud_alerts": int(row["fraud_alerts"] or 0)
+            "month": str(row["month"]),
+            "total_transactions": int(row["total_transactions"] or 0),
+            "fraud_alerts": int(row["total_alerts"] or 0),
+            "total_loss": float(row["total_loss"] or 0),
         } for row in results]
 
-        # Reverse to show oldest first if desired
+        # Oldest month first for chart order
         data.reverse()
 
         return jsonify({"data": data})
@@ -471,40 +319,21 @@ def monthly_chart():
         print(f"Error fetching monthly chart data: {str(e)}")
         return jsonify({"data": [], "error": str(e)}), 500
 
-#Scatter plot data for ml_anomaly_score vs amount
+# Scatter plot data for ml_anomaly_score vs amount (master_viz only)
 @app.route("/api/charts/scatter")
 def scatter_chart():
     try:
-
-        if TABLE_NAME == "master_viz":
-            query = f"""
-                SELECT 
-                    amount,
-                    ml_predicted_score AS ml_anomaly_score,
-                    ml_predicted_category AS risk_level
-                FROM {get_table()}
-                WHERE DATE(transaction_date) >= '2024-01-01'
-                    AND amount IS NOT NULL
-                    AND ml_predicted_score IS NOT NULL
-                    AND ml_predicted_category IS NOT NULL
-            """
-
-        elif TABLE_NAME == "gold_automation":
-            query = f"""
-                SELECT 
-                    amount,
-                    rule_based_score AS ml_anomaly_score,
-                    threat_severity AS risk_level
-                FROM {get_table()}
-                WHERE DATE(transaction_date) >= '2024-01-01'
-                    AND amount IS NOT NULL
-                    AND rule_based_score IS NOT NULL
-                    AND threat_severity IS NOT NULL
-            """
-
-        else:
-            return jsonify({"error": "Unsupported table"}), 400
-
+        query = f"""
+            SELECT 
+                amount,
+                ml_predicted_score AS ml_anomaly_score,
+                ml_predicted_category AS risk_level
+            FROM {get_master_viz_table()}
+            WHERE DATE(transaction_date) >= '2024-01-01'
+                AND amount IS NOT NULL
+                AND ml_predicted_score IS NOT NULL
+                AND ml_predicted_category IS NOT NULL
+        """
         results = client.query(query).result()
 
         data = [{
@@ -520,36 +349,19 @@ def scatter_chart():
         return jsonify({"data": [], "error": str(e)}), 500
 
 
-#Time series data for anomaly counts by hour
+# Time series data for anomaly counts by hour (master_viz only)
 @app.route("/api/charts/timeseries")
 def timeseries_chart():
     try:
-
-        if TABLE_NAME == "master_viz":
-            query = f"""
-                SELECT 
-                    EXTRACT(HOUR FROM entry_time) AS hour,
-                    COUNT(*) AS fraud_count
-                FROM {get_table()}
-                WHERE is_anomaly = 1
-                GROUP BY hour
-                ORDER BY hour
-            """
-
-        elif TABLE_NAME == "gold_automation":
-            query = f"""
-                SELECT 
-                    EXTRACT(HOUR FROM entry_time) AS hour,
-                    COUNT(*) AS fraud_count
-                FROM {get_table()}
-                WHERE flag_fraud = TRUE
-                GROUP BY hour
-                ORDER BY hour
-            """
-
-        else:
-            return jsonify({"error": "Unsupported table"}), 400
-
+        query = f"""
+            SELECT 
+                EXTRACT(HOUR FROM entry_time) AS hour,
+                COUNT(*) AS fraud_count
+            FROM {get_master_viz_table()}
+            WHERE is_anomaly = 1
+            GROUP BY hour
+            ORDER BY hour
+        """
         results = client.query(query).result()
 
         data = [{
@@ -586,10 +398,10 @@ def update_status():
         transaction_id_escaped = str(transaction_id).replace("'", "''")
         new_status_escaped = str(new_status).replace("'", "''")
 
-        # Get current status
+        # Transactions tab: master_viz only
         query = f"""
             SELECT status
-            FROM {get_table()}
+            FROM {get_master_viz_table()}
             WHERE transaction_id = '{transaction_id_escaped}'
         """
         results = client.query(query).result()
@@ -615,21 +427,11 @@ def update_status():
                     "allowed": allowed_transitions
                 }), 400
 
-        # Update status - only update last_updated if the column exists
-        if TABLE_NAME == "master_viz":
-            update_query = f"""
-                UPDATE {get_table()}
-                SET status = '{new_status_escaped}', last_updated = CURRENT_TIMESTAMP()
-                WHERE transaction_id = '{transaction_id_escaped}'
-            """
-        else:
-            # gold_automation might not have last_updated column
-            update_query = f"""
-                UPDATE {get_table()}
-                SET status = '{new_status_escaped}'
-                WHERE transaction_id = '{transaction_id_escaped}'
-            """
-
+        update_query = f"""
+            UPDATE {get_master_viz_table()}
+            SET status = '{new_status_escaped}', last_updated = CURRENT_TIMESTAMP()
+            WHERE transaction_id = '{transaction_id_escaped}'
+        """
         client.query(update_query).result()
 
         return jsonify({"success": True})
@@ -639,11 +441,10 @@ def update_status():
 
 @app.route("/api/table-info")
 def table_info():
-    """Return information about the current table being used"""
+    """Return information about the table being used (master_viz only)."""
     return jsonify({
-        "table_name": TABLE_NAME,
-        "is_master_viz": TABLE_NAME == "master_viz",
-        "is_gold_automation": TABLE_NAME == "gold_automation"
+        "table_name": "master_viz",
+        "is_master_viz": True,
     })
 
 

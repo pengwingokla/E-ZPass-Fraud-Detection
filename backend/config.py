@@ -58,3 +58,18 @@ table_name = os.getenv("BIGQUERY_TABLE", "master_viz").strip() or "master_viz"
 def get_table() -> str:
     """Fully qualified BigQuery table id, e.g. `project.dataset.table`."""
     return f"`{project_id}.{dataset}.{table_name}`"
+
+
+def get_master_viz_table() -> str:
+    """Fully qualified master_viz table. Use for Transactions tab (list, count, alerts, recent-flagged, update-status)."""
+    return f"`{project_id}.{dataset}.master_viz`"
+
+
+def get_metrics_table() -> str:
+    """Fully qualified _stats table. Use for dashboard stats only."""
+    return f"`{project_id}.{dataset}._stats`"
+
+
+def get_stats_month_table() -> str:
+    """Fully qualified _stats_month table. Use for Transaction Analysis chart."""
+    return f"`{project_id}.{dataset}._stats_month`"

@@ -8,8 +8,8 @@ cd "$(dirname "$0")/.."
 COMPOSE_CMD="docker compose --env-file .env -f deploy/docker-compose.yaml"
 PORTS="8080 8081 5001 5003 5005 5007"
 
-echo "Stopping compose stack..."
-$COMPOSE_CMD down 2>/dev/null || true
+echo "Docker Compose down..."
+$COMPOSE_CMD down
 
 echo "Killing processes on ports: $PORTS"
 for port in $PORTS; do
@@ -19,6 +19,9 @@ for port in $PORTS; do
     echo "$pids" | xargs kill -9 2>/dev/null || true
   fi
 done
+
+echo "Building app image (frontend + backend)..."
+$COMPOSE_CMD build app
 
 echo "Starting stack..."
 $COMPOSE_CMD up -d

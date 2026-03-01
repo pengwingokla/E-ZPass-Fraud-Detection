@@ -134,6 +134,5 @@ with DAG(
         }
     )
     
-    # Execution order: deps -> silver -> gold_rulebased/gold_train -> remaining gold -> model_training DAG -> pred_viz -> master_viz
+    # Execution order: deps -> silver -> gold_train -> remaining gold -> model_training -> pred_viz -> master_viz
     dbt_deps >> dbt_run_silver >> dbt_run_gold_train >> dbt_run_gold >> trigger_model_training >> dbt_run_pred_viz >> dbt_run_master_viz
-
