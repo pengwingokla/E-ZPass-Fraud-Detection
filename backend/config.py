@@ -7,6 +7,8 @@ import os
 import tempfile
 
 from dotenv import load_dotenv
+from google.auth.credentials import AnonymousCredentials
+from google.auth.exceptions import DefaultCredentialsError
 from google.cloud import bigquery
 
 # Load env: backend/.env then repo root .env
@@ -20,9 +22,11 @@ def _get_project_id() -> str:
         os.getenv("GCS_PROJECT_ID") or os.getenv("BIGQUERY_PROJECT_ID") or ""
     ).strip()
     if not project_id:
-        raise ValueError(
-            "GCS_PROJECT_ID or BIGQUERY_PROJECT_ID must be set to your GCP project ID."
-        )
+        # In CI/unit tests (especially fork PRs), GCP env/secrets may be unavailable.
+        # We still want the app module to import so tests can patch/mocks can run.
+        if os.getenv("PYTEST_CURRENT_TEST") or os.getenv("GITHUB_ACTIONS"):
+            return "test-project"
+        raise ValueError("GCS_PROJECT_ID or BIGQUERY_PROJECT_ID must be set to your GCP project ID.")
     return project_id
 
 
@@ -43,8 +47,15 @@ else:
     if _creds_path and os.path.exists(_creds_path):
         _client = bigquery.Client.from_service_account_json(_creds_path)
     else:
-        # Fall back to ADC (e.g., when running with gcloud auth application-default login)
-        _client = bigquery.Client()
+        # Fall back to ADC (e.g., when running with gcloud auth application-default login).
+        # On CI (and local dev without ADC), avoid failing at import-time—tests patch `app.client`.
+        try:
+            _client = bigquery.Client(project=_get_project_id())
+        except DefaultCredentialsError:
+            _client = bigquery.Client(
+                project=_get_project_id(),
+                credentials=AnonymousCredentials(),
+            )
 
 # BigQuery client
 client = _client
