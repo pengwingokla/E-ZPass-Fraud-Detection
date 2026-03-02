@@ -1019,6 +1019,689 @@ const DashboardView = ({ setActiveView }) => {
     );
 };
 
+const MetricSparklineCard = ({
+    title,
+    color,
+    gradientFrom,
+    gradientTo,
+    initialValue,
+    unitSuffix
+}) => {
+    const [values, setValues] = useState(() =>
+        Array.from({ length: 30 }, () => initialValue * (0.9 + Math.random() * 0.2))
+    );
+    const [sampleCount, setSampleCount] = useState(values.length);
+
+    const metricTextStyle = {
+        fontFamily:
+            '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+        fontWeight: 700,
+        letterSpacing: '-0.5px',
+    };
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setValues(prev => {
+                if (!prev || prev.length === 0) {
+                    return [initialValue];
+                }
+                const last = prev[prev.length - 1];
+                const drift = last * 0.05 || 1;
+                let next = last + (Math.random() - 0.5) * drift;
+                if (next < 0) next = 0;
+                const updated = [...prev.slice(1), next];
+                return updated;
+            });
+            setSampleCount(count => count + 1);
+        }, 2000);
+
+        return () => clearInterval(interval);
+    }, [initialValue]);
+
+    const current = values[values.length - 1] ?? initialValue;
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const gradientId = `${title.replace(/\s+/g, '-').toLowerCase()}-sparkline-gradient`;
+
+    // Fixed coordinate system for sparkline; rendered size scales with container
+    const width = 200;
+    const height = 50;
+
+    const points = values.map((v, idx) => {
+        const x = (idx / Math.max(values.length - 1, 1)) * width;
+        const range = max - min || 1;
+        const yNorm = (v - min) / range;
+        const y = height - yNorm * (height - 4) - 2; // small vertical padding
+        return [x, y];
+    });
+
+    const linePath = points
+        .map(([x, y], idx) => `${idx === 0 ? 'M' : 'L'}${x},${y}`)
+        .join(' ');
+
+    const areaPath =
+        points.length > 1
+            ? `${linePath} L ${points[points.length - 1][0]},${height} L ${points[0][0]},${height} Z`
+            : '';
+
+    const latestPoint = points[points.length - 1] || [width, height / 2];
+
+    return (
+        <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                    {title.toUpperCase()}
+                </span>
+            </div>
+            <div className="flex items-baseline justify-between mb-2">
+                <span
+                    className="text-2xl text-slate-900 dark:text-slate-50"
+                    style={metricTextStyle}
+                >
+                    {unitSuffix === 'ms'
+                        ? `${current.toFixed(0)} ms`
+                        : `${current.toFixed(0).toLocaleString?.() || current.toFixed(0)} rows/hr`}
+                </span>
+                <span
+                    className="text-[11px] text-slate-400 dark:text-slate-500"
+                    style={metricTextStyle}
+                >
+                    {sampleCount} samples
+                </span>
+            </div>
+            <div className="w-full h-16 mb-1" style={{ overflow: 'hidden' }}>
+                <svg
+                    viewBox={`0 0 ${width} ${height}`}
+                    width="100%"
+                    height="100%"
+                    preserveAspectRatio="none"
+                >
+                    <defs>
+                        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={gradientFrom} stopOpacity="0.6" />
+                            <stop offset="100%" stopColor={gradientTo} stopOpacity="0" />
+                        </linearGradient>
+                    </defs>
+                    {areaPath && (
+                        <path d={areaPath} fill={`url(#${gradientId})`} stroke="none" />
+                    )}
+                    {linePath && (
+                        <path
+                            d={linePath}
+                            fill="none"
+                            stroke={color}
+                            strokeWidth="1.2"
+                            strokeLinecap="round"
+                        />
+                    )}
+                    <circle
+                        cx={latestPoint[0]}
+                        cy={latestPoint[1]}
+                        r="2.2"
+                        fill={color}
+                        stroke="white"
+                        strokeWidth="0.8"
+                    />
+                </svg>
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500">
+                <span style={metricTextStyle}>min {min.toFixed(1)}</span>
+                <span style={metricTextStyle}>max {max.toFixed(1)}</span>
+            </div>
+        </div>
+    );
+};
+
+const ModelStatusCard = () => {
+    const metricMonoStyle = {
+        fontFamily:
+            '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+        fontWeight: 700,
+        letterSpacing: '-0.5px',
+    };
+
+    return (
+        <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm">
+            <h3 className="text-xs font-semibold tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                MODEL STATUS
+            </h3>
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Isolation Forest */}
+                <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col justify-between h-full">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="text-sm font-medium text-slate-900 dark:text-slate-50">
+                            Isolation Forest v2.1
+                        </div>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800">
+                            Production
+                        </span>
+                    </div>
+                    <div className="flex items-start justify-between gap-4 mb-3">
+                        <div className="flex-1">
+                            <div className="text-[10px] font-semibold tracking-[0.18em] text-slate-400 dark:text-slate-500">
+                                PRECISION
+                            </div>
+                            <div
+                                className="mt-1 text-sm text-slate-900 dark:text-slate-50"
+                                style={metricMonoStyle}
+                            >
+                                94.2%
+                            </div>
+                        </div>
+                        <div className="flex-1">
+                            <div className="text-[10px] font-semibold tracking-[0.18em] text-slate-400 dark:text-slate-500">
+                                RECALL
+                            </div>
+                            <div
+                                className="mt-1 text-sm text-slate-900 dark:text-slate-50"
+                                style={metricMonoStyle}
+                            >
+                                88.7%
+                            </div>
+                        </div>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 dark:text-slate-500 space-y-1">
+                        <p>Trained Apr 28 2025</p>
+                        <p>Next refresh May 15 2025</p>
+                    </div>
+                </div>
+
+                {/* Logistic Baseline */}
+                <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col justify-between h-full">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="text-sm font-medium text-slate-900 dark:text-slate-50">
+                            Logistic Baseline v1.0
+                        </div>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium text-sky-700 bg-sky-50 border border-sky-100 dark:bg-sky-900/30 dark:text-sky-300 dark:border-sky-800">
+                            Shadowing
+                        </span>
+                    </div>
+                    <div className="flex items-start justify-between gap-4 mb-3">
+                        <div className="flex-1">
+                            <div className="text-[10px] font-semibold tracking-[0.18em] text-slate-400 dark:text-slate-500">
+                                PRECISION
+                            </div>
+                            <div
+                                className="mt-1 text-sm text-slate-900 dark:text-slate-50"
+                                style={metricMonoStyle}
+                            >
+                                89.1%
+                            </div>
+                        </div>
+                        <div className="flex-1">
+                            <div className="text-[10px] font-semibold tracking-[0.18em] text-slate-400 dark:text-slate-500">
+                                RECALL
+                            </div>
+                            <div
+                                className="mt-1 text-sm text-slate-900 dark:text-slate-50"
+                                style={metricMonoStyle}
+                            >
+                                82.3%
+                            </div>
+                        </div>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 dark:text-slate-500 space-y-1">
+                        <p>Trained Apr 15 2025</p>
+                        <p>Next refresh May 25 2025</p>
+                    </div>
+                </div>
+
+                {/* XGBoost Candidate */}
+                <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col justify-between h-full">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="text-sm font-medium text-slate-900 dark:text-slate-50">
+                            XGBoost Candidate v0.3
+                        </div>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800">
+                            Training
+                        </span>
+                    </div>
+                    <div className="flex items-start justify-between gap-4 mb-3">
+                        <div className="flex-1">
+                            <div className="text-[10px] font-semibold tracking-[0.18em] text-slate-400 dark:text-slate-500">
+                                PRECISION
+                            </div>
+                            <div
+                                className="mt-1 text-sm text-slate-900 dark:text-slate-50"
+                                style={metricMonoStyle}
+                            >
+                                —
+                            </div>
+                        </div>
+                        <div className="flex-1">
+                            <div className="text-[10px] font-semibold tracking-[0.18em] text-slate-400 dark:text-slate-500">
+                                RECALL
+                            </div>
+                            <div
+                                className="mt-1 text-sm text-slate-900 dark:text-slate-50"
+                                style={metricMonoStyle}
+                            >
+                                —
+                            </div>
+                        </div>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 dark:text-slate-500 space-y-1">
+                        <p>Trained In progress</p>
+                        <p>Next refresh —</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const RunHistoryCard = () => {
+    const numericMonoStyle = {
+        fontFamily:
+            '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+        fontWeight: 700,
+        letterSpacing: '-0.5px',
+    };
+
+    const runs = [
+        {
+            file: 'njtp_may_batch1.csv',
+            time: 'May 11 14:30',
+            rows: '3,412',
+            alerts: 18,
+            duration: '4m 12s',
+            latency: 252,
+            status: 'success',
+        },
+        {
+            file: 'panynj_apr_final.csv',
+            time: 'May 10 09:15',
+            rows: '2,890',
+            alerts: 9,
+            duration: '3m 58s',
+            latency: 238,
+            status: 'success',
+        },
+        {
+            file: 'mtabt_mixed.csv',
+            time: 'May 08 17:03',
+            rows: '1,200',
+            alerts: 0,
+            duration: '1m 22s',
+            latency: 82,
+            status: 'failed',
+        },
+        {
+            file: 'njtp_may_preview.csv',
+            time: 'May 07 11:00',
+            rows: '980',
+            alerts: 4,
+            duration: '2m 51s',
+            latency: 171,
+            status: 'success',
+        },
+        {
+            file: 'panynj_may_batch1.csv',
+            time: 'May 05 08:00',
+            rows: '4,100',
+            alerts: 31,
+            duration: '5m 03s',
+            latency: 303,
+            status: 'success',
+        },
+    ];
+
+    const getStatusClasses = (status) => {
+        if (status === 'success') {
+            return 'bg-emerald-50 text-emerald-700 border border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800';
+        }
+        return 'bg-rose-50 text-rose-700 border border-rose-100 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-800';
+    };
+
+    return (
+        <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xs font-semibold tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                    RUN HISTORY
+                </h3>
+                <span className="text-[11px] text-slate-400 dark:text-slate-500">last 5 runs</span>
+            </div>
+            <div className="overflow-x-auto">
+                <table className="min-w-full text-xs">
+                    <thead>
+                        <tr className="text-[10px] font-semibold tracking-[0.18em] text-slate-400 dark:text-slate-500 uppercase">
+                            <th className="text-left pb-2 pr-4">File</th>
+                            <th className="text-left pb-2 pr-4">Time</th>
+                            <th className="text-right pb-2 pr-4">Rows</th>
+                            <th className="text-right pb-2 pr-4">Alerts</th>
+                            <th className="text-right pb-2 pr-4">Duration</th>
+                            <th className="text-right pb-2 pr-4">Latency</th>
+                            <th className="text-right pb-2">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {runs.map((run, idx) => {
+                            const latencyClass =
+                                run.latency < 280
+                                    ? 'text-emerald-500'
+                                    : 'text-amber-500';
+                            const hasAlerts = run.alerts > 0;
+                            return (
+                                <tr
+                                    key={run.file + run.time}
+                                    className={`border-t border-slate-100 dark:border-slate-800 ${
+                                        idx === 0 ? '' : ''
+                                    }`}
+                                >
+                                    <td className="py-2 pr-4 align-middle">
+                                        <div className="max-w-[160px] truncate text-slate-800 dark:text-slate-100">
+                                            {run.file}
+                                        </div>
+                                    </td>
+                                    <td className="py-2 pr-4 align-middle text-slate-500 dark:text-slate-400">
+                                        {run.time}
+                                    </td>
+                                    <td
+                                        className="py-2 pr-4 align-middle text-right text-slate-700 dark:text-slate-200"
+                                        style={numericMonoStyle}
+                                    >
+                                        {run.rows}
+                                    </td>
+                                    <td className="py-2 pr-4 align-middle text-right">
+                                        {hasAlerts ? (
+                                            <span
+                                                className="text-rose-500 font-semibold"
+                                                style={numericMonoStyle}
+                                            >
+                                                {run.alerts}
+                                            </span>
+                                        ) : (
+                                            <span className="text-slate-400 dark:text-slate-500">—</span>
+                                        )}
+                                    </td>
+                                    <td
+                                        className="py-2 pr-4 align-middle text-right text-slate-700 dark:text-slate-200"
+                                        style={numericMonoStyle}
+                                    >
+                                        {run.duration}
+                                    </td>
+                                    <td
+                                        className={`py-2 pr-4 align-middle text-right ${latencyClass}`}
+                                        style={numericMonoStyle}
+                                    >
+                                        {run.latency}ms
+                                    </td>
+                                    <td className="py-2 align-middle text-right">
+                                        <span
+                                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${getStatusClasses(
+                                                run.status
+                                            )}`}
+                                        >
+                                            {run.status === 'success' ? 'success' : 'failed'}
+                                        </span>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
+
+const MonitorView = () => {
+    const [uploading, setUploading] = useState(false);
+    const [uploadMessage, setUploadMessage] = useState('');
+    const [isDragOver, setIsDragOver] = useState(false);
+
+    const handleFileUpload = async (file) => {
+        setUploadMessage('');
+
+        if (!file) return;
+        if (!file.name.toLowerCase().endsWith('.csv')) {
+            setUploadMessage('Please upload a CSV file (.csv).');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            setUploading(true);
+            const response = await fetch(`${apiUrl}/api/upload-csv`, {
+                method: 'POST',
+                body: formData,
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) {
+                throw new Error(result.error || 'Upload failed');
+            }
+            setUploadMessage(`Uploaded ${result.filename} successfully.`);
+        } catch (error) {
+            console.error('Error uploading CSV:', error);
+            setUploadMessage('Failed to upload file. Please try again.');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleFileChange = (event) => {
+        const file = event.target.files[0];
+        handleFileUpload(file);
+    };
+
+    const handleDragOver = (event) => {
+        event.preventDefault();
+        setIsDragOver(true);
+    };
+
+    const handleDragLeave = (event) => {
+        event.preventDefault();
+        setIsDragOver(false);
+    };
+
+    const handleDrop = (event) => {
+        event.preventDefault();
+        setIsDragOver(false);
+        const file = event.dataTransfer?.files?.[0];
+        if (file) {
+            handleFileUpload(file);
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                {/* Data Ingestion card - top left */}
+                <div className="lg:col-span-1 space-y-4">
+                    <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm">
+                        <h2 className="text-xs font-semibold tracking-[0.18em] text-slate-500 dark:text-slate-400 mb-4">
+                            DATA INGESTION
+                        </h2>
+                        <div
+                            className={`rounded-2xl border-2 border-dashed transition-colors duration-200 px-8 py-8 flex flex-col items-center justify-center cursor-pointer bg-white dark:bg-slate-900/40 ${
+                                isDragOver
+                                    ? 'border-blue-400 bg-blue-50/60 dark:border-blue-500 dark:bg-slate-900/60'
+                                    : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50 dark:border-gray-600 dark:hover:border-gray-400'
+                            }`}
+                            onDragOver={handleDragOver}
+                            onDragLeave={handleDragLeave}
+                            onDrop={handleDrop}
+                            onClick={() => document.getElementById('data-ingestion-upload')?.click()}
+                        >
+                            <input
+                                id="data-ingestion-upload"
+                                type="file"
+                                accept=".csv,text/csv"
+                                className="hidden"
+                                onChange={handleFileChange}
+                            />
+                            <svg
+                                className="w-9 h-9 mb-3 text-slate-400"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth="1.6"
+                                aria-hidden="true"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M3 15a4 4 0 0 1 3.5-3.97A5 5 0 0 1 19 11a3 3 0 0 1 1 5.83M9 15l3-3m0 0 3 3m-3-3v7"
+                                />
+                            </svg>
+                            <p className="text-sm font-semibold text-slate-600 dark:text-slate-200 text-center">
+                                Choose a file or drag &amp; drop it here
+                            </p>
+                            <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500 text-center">
+                                CSV files only, up to 50MB
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => document.getElementById('data-ingestion-upload')?.click()}
+                                className="mt-4 inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                                Browse File
+                            </button>
+                        </div>
+                        {uploadMessage && (
+                            <p className="mt-3 text-xs text-slate-700 dark:text-gray-300">
+                                {uploadMessage}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Job Health status card */}
+                    <div className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-6">
+                        <h3 className="text-xs font-semibold tracking-[0.18em] text-gray-500 dark:text-gray-400 mb-3">
+                            JOB HEALTH
+                        </h3>
+                        <div className="mt-2 rounded-xl text-xs">
+                            <div>
+                                {/* Data Intake → GCS */}
+                                <div className="flex items-center justify-between pl-0 pr-3 py-2 gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                                        <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                                            Data Intake
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="inline-flex px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-100 dark:bg-sky-900/40 dark:text-sky-300 dark:border-sky-800">
+                                            GCS
+                                        </span>
+                                        <span className="font-semibold text-emerald-500">100.0%</span>
+                                    </div>
+                                </div>
+
+                                {/* Record Cleansing → Airflow */}
+                                <div className="flex items-center justify-between pl-0 pr-3 py-2 gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                                        <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                                            Record Cleansing
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="inline-flex px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-800">
+                                            Airflow
+                                        </span>
+                                        <span className="font-semibold text-emerald-500">100.0%</span>
+                                    </div>
+                                </div>
+
+                                {/* Warehouse Load → BigQuery */}
+                                <div className="flex items-center justify-between pl-0 pr-3 py-2 gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                                        <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                                            Warehouse Load
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="inline-flex px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800">
+                                            BigQuery
+                                        </span>
+                                        <span className="font-semibold text-emerald-500">100.0%</span>
+                                    </div>
+                                </div>
+
+                                {/* Feature Engineering → dbt */}
+                                <div className="flex items-center justify-between pl-0 pr-3 py-2 gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                                        <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                                            Feature Engineering
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="inline-flex px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-100 dark:bg-orange-900/40 dark:text-orange-300 dark:border-orange-800">
+                                            dbt
+                                        </span>
+                                        <span className="font-semibold text-emerald-500">100.0%</span>
+                                    </div>
+                                </div>
+
+                                {/* Fraud Scoring → Vertex AI */}
+                                <div className="flex items-center justify-between pl-0 pr-3 py-2 gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <span className="inline-flex h-2.5 w-2.5 rounded-full bg-amber-400" />
+                                        <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                                            Fraud Scoring
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="inline-flex px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800">
+                                            Vertex AI
+                                        </span>
+                                        <span className="font-semibold text-amber-500">50.0%</span>
+                                    </div>
+                                </div>
+
+                                {/* Risk Aggregation → BigQuery */}
+                                <div className="flex items-center justify-between pl-0 pr-3 py-2 gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <span className="inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+                                        <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                                            Risk Aggregation
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="inline-flex px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800">
+                                            BigQuery
+                                        </span>
+                                        <span className="font-semibold text-red-500">0.0%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right-hand metrics + model status */}
+                <div className="lg:col-span-2 space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <MetricSparklineCard
+                            title="End-to-End Latency"
+                            color="#3b82f6"
+                            gradientFrom="rgba(59,130,246,0.45)"
+                            gradientTo="rgba(59,130,246,0.05)"
+                            initialValue={320}
+                            unitSuffix="ms"
+                        />
+                        <MetricSparklineCard
+                            title="Throughput"
+                            color="#9546A7"
+                            gradientFrom="rgba(149,70,167,0.45)"
+                            gradientTo="rgba(149,70,167,0.05)"
+                            initialValue={12000}
+                            unitSuffix="rows/hr"
+                        />
+                    </div>
+                    <ModelStatusCard />
+                    <RunHistoryCard />
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const ScatterPlot = () => {
     const [chartData, setChartData] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -2069,7 +2752,7 @@ const handleLogout = () => {
                                 {/* Navigation / User / Theme */}
                                 <div className="flex items-center gap-4">
                                     {/* Navigation Toggle */}
-                                    <div className="flex items-center p-1.5 rounded-xl bg-white dark:bg-white/5 backdrop-blur-sm border border-gray-200 dark:border-white/10 shadow-inner dark:shadow-[inset_4px_4px_8px_rgba(0,0,0,0.3),inset_-2px_-2px_4px_rgba(255,255,255,0.05)]">
+                                <div className="flex items-center p-1.5 rounded-xl bg-white dark:bg-white/5 backdrop-blur-sm border border-gray-200 dark:border-white/10 shadow-inner dark:shadow-[inset_4px_4px_8px_rgba(0,0,0,0.3),inset_-2px_-2px_4px_rgba(255,255,255,0.05)]">
                                         <button 
                                             onClick={() => setActiveView('dashboard')} 
                                             className={`px-6 py-2.5 text-sm font-semibold rounded-lg focus:outline-none transition-all duration-300 ${
@@ -2079,6 +2762,16 @@ const handleLogout = () => {
                                             }`}
                                         >
                                             Dashboard
+                                        </button>
+                                        <button 
+                                            onClick={() => setActiveView('monitor')} 
+                                            className={`px-6 py-2.5 text-sm font-semibold rounded-lg focus:outline-none transition-all duration-300 ${
+                                                activeView === 'monitor' 
+                                                    ? 'bg-gradient-to-r from-[#9546A7] to-[#7A3A8F] text-white' 
+                                                    : 'text-gray-400 dark:text-gray-400 text-gray-600 hover:text-black dark:hover:text-white hover:text-gray-900'
+                                            }`}
+                                        >
+                                            Monitor
                                         </button>
                                         <button 
                                             onClick={() => setActiveView('data')} 
@@ -2134,9 +2827,15 @@ const handleLogout = () => {
 
                     {/* Main Content */}
                     <main className="animate-fadeIn">
-                        {activeView === 'dashboard' ? <DashboardView setActiveView={setActiveView} /> : 
-                         activeView === 'charts' ? <ChartsView /> : 
-                         <DataView />}
+                        {activeView === 'dashboard' ? (
+                            <DashboardView setActiveView={setActiveView} />
+                        ) : activeView === 'monitor' ? (
+                            <MonitorView />
+                        ) : activeView === 'charts' ? (
+                            <ChartsView />
+                        ) : (
+                            <DataView />
+                        )}
                     </main>
                 </div>
             </div>
