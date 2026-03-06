@@ -7,6 +7,7 @@ from sklearn.cluster import DBSCAN
 import joblib
 import os
 from datetime import datetime
+import time
 import mlflow
 import mlflow.sklearn
 from mlflow.tracking import MlflowClient
@@ -466,11 +467,93 @@ class FraudDetectionTrainer:
             print(f"⚠ Error logging metrics to BigQuery: {e}")
             print(f"⚠ Skipping metrics logging - training will continue")
 
+    def log_run_history(
+        self,
+        raw_file_name,
+        start_time,
+        n_rows,
+        n_alerts,
+        total_duration_seconds,
+        latency_seconds,
+        status,
+    ):
+        """Save end-to-end run history to BigQuery _run_history table"""
+        from google.cloud import bigquery
+        from google.api_core import exceptions
+        import pandas as pd
+
+        client = bigquery.Client(project=self.project_id)
+        table_id = f"{self.project_id}.ezpass_data._run_history"
+
+        run_record = {
+            "raw_file_name": raw_file_name,
+            "start_time": start_time,
+            "n_rows": int(n_rows) if n_rows is not None else None,
+            "n_alerts": int(n_alerts) if n_alerts is not None else None,
+            "total_duration_seconds": float(total_duration_seconds) if total_duration_seconds is not None else None,
+            "latency_seconds": float(latency_seconds) if latency_seconds is not None else None,
+            "status": status,
+        }
+
+        df = pd.DataFrame([run_record])
+
+        try:
+            # Check if table exists first
+            try:
+                client.get_table(table_id)
+            except Exception:
+                # Table doesn't exist - try to create it
+                print(f"⚠ Table {table_id} does not exist, attempting to create...")
+                schema = [
+                    bigquery.SchemaField("raw_file_name", "STRING"),
+                    bigquery.SchemaField("start_time", "TIMESTAMP"),
+                    bigquery.SchemaField("n_rows", "INTEGER"),
+                    bigquery.SchemaField("n_alerts", "INTEGER"),
+                    bigquery.SchemaField("total_duration_seconds", "FLOAT64"),
+                    bigquery.SchemaField("latency_seconds", "FLOAT64"),
+                    bigquery.SchemaField("status", "STRING"),
+                ]
+                table = bigquery.Table(table_id, schema=schema)
+                table.description = "End-to-end run history for monthly training runs"
+                try:
+                    client.create_table(table)
+                    print(f"✓ Created run history table: {table_id}")
+                except exceptions.Forbidden as e:
+                    print(f"⚠ Permission denied: Cannot create table {table_id}")
+                    print(f"⚠ Skipping run history logging - table must be created manually or permissions granted")
+                    return
+
+            # Table exists, append data
+            job_config = bigquery.LoadJobConfig(
+                write_disposition="WRITE_APPEND",
+                create_disposition="CREATE_NEVER",
+            )
+
+            client.load_table_from_dataframe(df, table_id, job_config=job_config).result()
+            print(f"✓ Run history logged to {table_id}")
+
+        except exceptions.Forbidden as e:
+            print(f"⚠ Permission denied: Cannot write to table {table_id}")
+            print(f"⚠ Error: {e}")
+            print(f"⚠ Skipping run history logging - ensure service account has BigQuery Data Editor role")
+        except Exception as e:
+            print(f"⚠ Error logging run history to BigQuery: {e}")
+            print(f"⚠ Skipping run history logging")
+
     def run_training_pipeline(self):
         """Execute full training pipeline"""
         print("=" * 60)
         print("STARTING ML TRAINING PIPELINE")
         print("=" * 60)
+
+        run_start_time = datetime.now()
+        wall_start = time.time()
+
+        raw_file_name = None
+        n_rows = 0
+        n_alerts = None
+        latency_seconds = None
+        status = "success"
 
         # Start MLflow run at the beginning if enabled
         if self.use_mlflow:
@@ -492,6 +575,21 @@ class FraudDetectionTrainer:
             # 1. Load features from BigQuery
             print("\n[1/7] Loading features from BigQuery")
             df = self.load_features_from_bigquery()
+
+            n_rows = len(df)
+            if "source_file" in df.columns and not df["source_file"].empty:
+                raw_file_name = str(df["source_file"].iloc[0])
+            else:
+                raw_file_name = "unknown"
+
+            # Latency: time from latest transaction_date in the dataset to pipeline start
+            if "transaction_date" in df.columns:
+                try:
+                    latest_txn = pd.to_datetime(df["transaction_date"]).max()
+                    if pd.notnull(latest_txn):
+                        latency_seconds = (run_start_time - latest_txn).total_seconds()
+                except Exception:
+                    latency_seconds = None
             
             if self.use_mlflow:
                 mlflow.log_param('dataset_size', len(df))
@@ -551,6 +649,10 @@ class FraudDetectionTrainer:
             print("\n[7/7] Writing predictions to BigQuery")
             output_table = f"{self.project_id}.ezpass_data.pred_raw"
             self.write_predictions_to_bigquery(df_original, predictions, anomaly_scores, output_table)
+
+            # Number of alerts is the number of anomalies predicted
+            if "n_anomalies" in metrics:
+                n_alerts = int(metrics["n_anomalies"])
             
             if self.use_mlflow:
                 mlflow.log_param('predictions_table', output_table)
@@ -569,11 +671,28 @@ class FraudDetectionTrainer:
             return isoforest_model, anomaly_scores, metrics
             
         except Exception as e:
+            status = "failed"
             if self.use_mlflow and mlflow.active_run():
                 mlflow.set_tag('status', 'failed')
                 mlflow.log_param('error', str(e))
             raise
         finally:
+            total_duration_seconds = time.time() - wall_start
+
+            # Best-effort logging of run history; do not block on failures here
+            try:
+                self.log_run_history(
+                    raw_file_name=raw_file_name,
+                    start_time=run_start_time,
+                    n_rows=n_rows,
+                    n_alerts=n_alerts,
+                    total_duration_seconds=total_duration_seconds,
+                    latency_seconds=latency_seconds,
+                    status=status,
+                )
+            except Exception as e:
+                print(f"⚠ Failed to log run history: {e}")
+
             if self.use_mlflow and mlflow.active_run():
                 mlflow.end_run()
 

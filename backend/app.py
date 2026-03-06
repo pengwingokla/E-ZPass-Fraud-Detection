@@ -1,6 +1,7 @@
 import os
 
 from flask import Flask, jsonify, request, send_from_directory
+from werkzeug.utils import secure_filename
 from flask_cors import CORS
 
 from config import client, get_metrics_table, get_master_viz_table, get_stats_month_table
@@ -446,6 +447,39 @@ def table_info():
         "table_name": "master_viz",
         "is_master_viz": True,
     })
+
+
+@app.route("/api/upload-csv", methods=["POST"])
+def upload_csv():
+    """
+    Accept a single CSV file upload and save it under data/raw/.
+    """
+    try:
+        if "file" not in request.files:
+            return jsonify({"error": "No file part in request"}), 400
+
+        file = request.files["file"]
+
+        if file.filename == "":
+            return jsonify({"error": "No selected file"}), 400
+
+        filename = secure_filename(file.filename)
+        if not filename.lower().endswith(".csv"):
+            return jsonify({"error": "Only .csv files are allowed"}), 400
+
+        # Resolve data/raw directory relative to project root
+        backend_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.abspath(os.path.join(backend_dir, os.pardir))
+        raw_dir = os.path.join(project_root, "data", "raw")
+        os.makedirs(raw_dir, exist_ok=True)
+
+        save_path = os.path.join(raw_dir, filename)
+        file.save(save_path)
+
+        return jsonify({"success": True, "filename": filename}), 200
+    except Exception as e:
+        print(f"Error uploading CSV: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 # Serve React app for all non-API routes (only if static folder exists)

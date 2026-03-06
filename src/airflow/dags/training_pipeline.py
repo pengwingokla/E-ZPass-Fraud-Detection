@@ -102,6 +102,38 @@ def create_metrics_training_table():
     
     return table_id
 
+def create_run_history_table():
+    """Create table to track end-to-end run history"""
+    from google.cloud import bigquery
+    
+    if not GCS_PROJECT_ID:
+        raise ValueError("GCS_PROJECT_ID must be set")
+    
+    client = bigquery.Client(project=GCS_PROJECT_ID)
+    table_id = f"{GCS_PROJECT_ID}.{BIGQUERY_DATASET}._run_history"
+    
+    schema = [
+        bigquery.SchemaField("raw_file_name", "STRING"),
+        bigquery.SchemaField("start_time", "TIMESTAMP"),
+        bigquery.SchemaField("n_rows", "INTEGER"),
+        bigquery.SchemaField("n_alerts", "INTEGER"),
+        bigquery.SchemaField("total_duration_seconds", "FLOAT64"),
+        bigquery.SchemaField("latency_seconds", "FLOAT64"),
+        bigquery.SchemaField("status", "STRING"),
+    ]
+    
+    try:
+        table = client.get_table(table_id)
+        print(f"✓ Run history table exists: {table_id}")
+    except Exception:
+        print(f"Creating run history table: {table_id}")
+        table = bigquery.Table(table_id, schema=schema)
+        table.description = "End-to-end run history for monthly training runs"
+        table = client.create_table(table)
+        print(f"✓ Created run history table: {table_id}")
+    
+    return table_id
+
 def delete_predictions_table():
     """Delete pred_raw table if it exists"""
     from google.cloud import bigquery
@@ -249,6 +281,11 @@ with DAG(
         python_callable=create_metrics_training_table
     )
     
+    create_run_history_table_task = PythonOperator(
+        task_id='create_run_history_table',
+        python_callable=create_run_history_table
+    )
+    
     delete_predictions_table_task = PythonOperator(
         task_id='delete_predictions_table',
         python_callable=delete_predictions_table
@@ -264,4 +301,4 @@ with DAG(
         python_callable=run_fraud_training
     )
     
-    delete_predictions_table_task >> create_dataset_task >> create_metrics_training_table_task >> create_predictions_table_task >> train_fraud_model_task
+    delete_predictions_table_task >> create_dataset_task >> create_metrics_training_table_task >> create_run_history_table_task >> create_predictions_table_task >> train_fraud_model_task
